@@ -1,0 +1,54 @@
+:root {
+  --bg: #16181d; --panel: #21242c; --line: #343842;
+  --text: #e8eaed; --dim: #9aa0ab;
+  --home: #3b82f6; --away: #ef4444;
+  --ok: #22c55e; --warn: #f59e0b; --danger: #7f1d1d;
+}
+* { box-sizing: border-box; }
+[v-cloak] { display: none; }
+
+body {
+  margin: 0; padding: 1rem; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Hiragino Sans", sans-serif;
+  -webkit-user-select: none; user-select: none;
+}
+
+.nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.nav a {
+  padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none;
+  background: var(--panel); color: var(--dim); border: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.nav a.here { color: var(--text); border-color: var(--dim); }
+
+.status { padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 1rem;
+          font-weight: bold; text-align: center; }
+.status.on  { background: #14532d; color: #86efac; }
+.status.off { background: var(--danger); color: #fecaca; }
+
+.card { background: var(--panel); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+.card h2 { margin: 0 0 0.9rem; font-size: 1rem; color: var(--dim); font-weight: normal; }
+
+button {
+  font-family: inherit; cursor: pointer; border-radius: 6px;
+  border: 1px solid var(--line); background: #2c313b; color: var(--text);
+}
+button:active { transform: translateY(1px); }
+button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+input, select {
+  background: #0f1115; color: var(--text); border: 1px solid var(--line);
+  border-radius: 5px; padding: 0.5rem; font-size: 1rem; font-family: inherit;
+}
+input[type=number] { width: 5.5rem; }
+input[type=range] { padding: 0; }
+
+/* 幅が足りなければラベルの下に折り返す。9remは目安であって固定値ではなく、
+   最小6remまでは縮み、それでも入らなければ次の行へ送る */
+.field { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 0.7rem; }
+.field > label { flex: 0 1 9rem; min-width: 6rem; font-size: 0.95rem; }
+.field .unit { color: var(--dim); font-size: 0.85rem; }
+
+kbd { background: #0f1115; border: 1px solid var(--line); border-radius: 3px;
+      padding: 1px 5px; font-size: 0.8rem; color: var(--dim); }
+.hint { color: var(--dim); font-size: 0.85rem; }

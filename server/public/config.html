@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設定</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/vue.global.js"></script>
+<link rel="stylesheet" href="/panel.css">
+<style>
+  .layout { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+  .side { flex: 0 0 200px; width: 200px; }
+  .content {
+    flex: 1 1 280px; min-width: 280px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(760px, 100%), 1fr));
+    gap: 1rem;
+    align-content: start;
+  }
+  .card-full { grid-column: 1 / -1; }
+
+  .side { background: var(--panel); border-radius: 10px; padding: 0.5rem; }
+  .side button {
+    display: block; width: 100%; text-align: left; padding: 0.7rem 0.9rem;
+    background: transparent; border: none; color: var(--dim);
+    font-size: 0.95rem; border-radius: 6px; margin-bottom: 0.2rem;
+  }
+  .side button.on { background: #2c313b; color: var(--text); }
+  .side .group { color: var(--dim); font-size: 0.75rem; padding: 0.6rem 0.9rem 0.2rem; }
+
+  .block { border: 1px solid var(--line); border-radius: 8px; padding: 0.9rem; margin-bottom: 0.8rem; }
+  .block h3 { margin: 0 0 0.7rem; font-size: 0.95rem; font-weight: normal; color: var(--text); }
+  .block .row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+  .block .row > label { flex: 0 1 4rem; min-width: 3.5rem; font-size: 0.9rem; color: var(--dim); }
+  .block input[type=range] { flex: 1 1 120px; min-width: 100px; }
+
+  .danger { background: var(--danger); border-color: #991b1b; padding: 0.9rem 1.5rem; font-size: 1rem; }
+
+  .stepper { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .stepper button { width: 2.4rem; height: 2.4rem; font-size: 1.3rem; font-weight: bold; flex-shrink: 0; }
+  .stepper .val {
+    min-width: 3rem; text-align: center; font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .counter-row { flex-wrap: wrap; }
+  .counter-row label { transition: color 0.15s ease; }
+  .counter-row label.maxed { color: var(--away); font-weight: bold; }
+
+  .switch {
+    position: relative; display: inline-block; flex-shrink: 0;
+    width: 122px; height: 38px; border-radius: 19px;
+    border: none; cursor: pointer; padding: 0;
+    transition: background-color 0.2s ease;
+  }
+  .switch-label {
+    position: absolute; top: 0; bottom: 0; width: 87px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: bold; color: #fff;
+    transition: left 0.2s ease; pointer-events: none;
+  }
+  .switch.on  .switch-label { left: 0; }
+  .switch.off .switch-label { left: 35px; }
+  .switch-knob {
+    position: absolute; top: 3px; width: 32px; height: 32px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+    transition: left 0.2s ease; pointer-events: none;
+  }
+  .switch.on  .switch-knob { left: 87px; }
+  .switch.off .switch-knob { left: 3px; }
+</style>
+</head>
+<body>
+
+<div id="app" v-cloak>
+  <nav class="nav">
+    <a href="/">入口</a>
+    <a href="/input.html">得点入力</a>
+    <a href="/config.html" class="here">設定</a>
+  </nav>
+
+  <div class="status" :class="connected ? 'on' : 'off'">
+    {{ connected ? '接続済み' : '⚠ 切断されました — 操作は反映されません' }}
+  </div>
+
+  <div v-if="state" class="layout">
+
+    <div class="side">
+      <div class="group">試合</div>
+      <button :class="{ on: tab === 'match' }" @click="tab = 'match'">試合設定</button>
+      <div class="group">表示の管理</div>
+      <button v-for="d in state.displayDefs" :key="d.id"
+              :class="{ on: tab === d.id }" @click="tab = d.id">{{ d.label }}</button>
+    </div>
+
+    <div class="content">
+      <template v-if="tab === 'match'">
+        <div class="card">
+          <h2>試合形式</h2>
+          <div class="field">
+            <label>セット数</label>
+            <stepper :value="state.rules.format" :min="1" :max="9"
+                     suffix="セットマッチ" @change="setRule('format', $event)"></stepper>
+          </div>
+          <div class="field">
+            <label>通常セット</label>
+            <stepper :value="state.rules.pointsToWin" :min="1" :max="99"
+                     suffix="点先取" @change="setRule('pointsToWin', $event)"></stepper>
+          </div>
+          <div class="field">
+            <label>最終セット</label>
+            <stepper :value="state.rules.finalSetPoints" :min="1" :max="99"
+                     suffix="点先取" @change="setRule('finalSetPoints', $event)"></stepper>
+          </div>
+          <p class="hint">
+            設定したセット数をすべて消化した時点で試合を終了します。
+            2セット・4セットなど偶数の場合、決着がつかなくても構わず
+            全セットをプレイします。
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>1セットあたりの回数</h2>
+          <div v-for="c in counterDefs" :key="c.kind" class="field counter-row">
+            <label :class="{ maxed: isMaxed(c) }">{{ c.label }}</label>
+            <stepper :value="state.rules[c.max]" :min="0" :max="c.cap"
+                     suffix="回" @change="setRule(c.max, $event)"></stepper>
+
+            <toggle-switch :value="state.rules.counterDisplay[c.kind].visible"
+                           on-text="表示" off-text="非表示"
+                           on-color="var(--ok)" off-color="#4b4f58"
+                           @change="setVisible(c.kind, $event)"></toggle-switch>
+
+            <toggle-switch :value="state.rules.counterDisplay[c.kind].mode === 'used'"
+                           on-text="加算" off-text="減算"
+                           on-color="var(--away)" off-color="var(--home)"
+                           @change="setMode(c.kind, $event)"></toggle-switch>
+          </div>
+          <p class="hint">
+            いずれかのチームが上限まで使い切ると、項目名が赤く表示されます。
+            表示/非表示と加算・減算は、タイムアウト・選手交代・チャレンジそれぞれで個別に設定でき、
+            すべての表示パターンに共通で反映されます。
+          </p>
+        </div>
+
+        <div class="card card-full">
+          <h2>試合のやり直し</h2>
+          <button class="danger" @click="resetMatch">試合をリセット</button>
+          <p class="hint" style="margin-bottom:0">
+            スコアとセット結果が消えます。チーム名・試合設定・表示の管理は残ります。
+          </p>
+        </div>
+      </template>
+
+      <template v-else-if="display">
+        <div class="card">
+          <h2>{{ currentDef.label }}</h2>
+          <div class="field">
+            <label>フォント</label>
+            <select :value="display.font" @change="setDisplay({ font: $event.target.value })">
+              <option value="system">システム標準</option>
+              <option v-for="f in fonts" :key="f.file" :value="f.file">{{ f.name }}</option>
+            </select>
+          </div>
+          <p class="hint" v-if="!fonts.length">
+            server/public/fonts/ に .woff2 / .otf / .ttf を置くと選択肢に出ます。
+          </p>
+          <p class="hint">
+            確認用:
+            <a :href="'/' + currentDef.file" target="_blank"
+               style="color:var(--dim)">{{ currentDef.file }} を開く</a>
+          </p>
+        </div>
+
+        <div class="card card-full">
+          <h2>ブロックごとの調整</h2>
+          <div v-for="b in blockDefs" :key="b.key" class="block">
+            <h3>{{ b.label }}</h3>
+
+            <div class="row" v-if="b.key === 'counter' && currentDef.counterStyleOption">
+              <label>表示形式</label>
+              <toggle-switch :value="display.blocks.counter.style === 'lamp'"
+                             on-text="ランプ" off-text="数字"
+                             on-color="var(--warn)" off-color="#4b4f58"
+                             @change="setCounterStyle"></toggle-switch>
+              <span class="hint">この画面(パターン)だけの設定です</span>
+            </div>
+
+            <div class="row">
+              <label>サイズ</label>
+              <input type="range" :min="b.min" :max="b.max" step="2"
+                     :value="display.blocks[b.key].size"
+                     @input="setBlock(b.key, { size: Number($event.target.value) })">
+              <input type="number" :min="b.min" :max="b.max"
+                     :value="display.blocks[b.key].size"
+                     @change="setBlock(b.key, { size: Number($event.target.value) })">
+            </div>
+            <div class="row">
+              <label>横位置</label>
+              <input type="range" min="-400" max="400" step="2"
+                     :value="display.blocks[b.key].x"
+                     @input="setBlock(b.key, { x: Number($event.target.value) })">
+              <input type="number" min="-400" max="400"
+                     :value="display.blocks[b.key].x"
+                     @change="setBlock(b.key, { x: Number($event.target.value) })">
+            </div>
+            <div class="row">
+              <label>縦位置</label>
+              <input type="range" min="-400" max="400" step="2"
+                     :value="display.blocks[b.key].y"
+                     @input="setBlock(b.key, { y: Number($event.target.value) })">
+              <input type="number" min="-400" max="400"
+                     :value="display.blocks[b.key].y"
+                     @change="setBlock(b.key, { y: Number($event.target.value) })">
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed } = Vue;
+
+const COUNTER_DEFS = [
+  { kind: 'timeouts',   label: 'タイムアウト', max: 'timeoutsPerSet',   cap: 9 },
+  { kind: 'subs',       label: '選手交代',     max: 'subsPerSet',       cap: 20 },
+  { kind: 'challenges', label: 'チャレンジ',   max: 'challengesPerSet', cap: 9 }
+];
+
+const BLOCK_DEFS = [
+  { key: 'name',    label: 'チーム名',                         min: 20, max: 200 },
+  { key: 'score',   label: '得点',                             min: 60, max: 700 },
+  { key: 'result',  label: 'セット結果',                       min: 20, max: 300 },
+  { key: 'counter', label: 'タイムアウト、選手交代、チャレンジ', min: 20, max: 300 }
+];
+
+const Stepper = {
+  props: {
+    value:  { type: Number, required: true },
+    min:    { type: Number, default: 0 },
+    max:    { type: Number, default: 99 },
+    step:   { type: Number, default: 1 },
+    suffix: { type: String, default: '' }
+  },
+  emits: ['change'],
+  template: `
+    <div class="stepper">
+      <button type="button" :disabled="value <= min"
+              @click="$emit('change', Math.max(min, value - step))">−</button>
+      <span class="val">{{ value }}</span>
+      <button type="button" :disabled="value >= max"
+              @click="$emit('change', Math.min(max, value + step))">+</button>
+      <span v-if="suffix" class="unit">{{ suffix }}</span>
+    </div>
+  `
+};
+
+const ToggleSwitch = {
+  props: {
+    value:    { type: Boolean, required: true },
+    onText:   { type: String, default: 'ON' },
+    offText:  { type: String, default: 'OFF' },
+    onColor:  { type: String, default: 'var(--ok)' },
+    offColor: { type: String, default: '#4b4f58' }
+  },
+  emits: ['change'],
+  template: `
+    <button type="button" class="switch" :class="value ? 'on' : 'off'"
+            :style="{ backgroundColor: value ? onColor : offColor }"
+            :aria-pressed="value" @click="$emit('change', !value)">
+      <span class="switch-label">{{ value ? onText : offText }}</span>
+      <span class="switch-knob"></span>
+    </button>
+  `
+};
+
+createApp({
+  setup() {
+    const state = ref(null);
+    const connected = ref(false);
+    const fonts = ref([]);
+    const tab = ref('match');
+    const socket = io();
+
+    socket.on('state', (s) => { state.value = s; });
+    socket.on('connect', () => { connected.value = true; });
+    socket.on('disconnect', () => { connected.value = false; });
+
+    fetch('/api/fonts').then((r) => r.json()).then((list) => { fonts.value = list; });
+
+    const currentDef = computed(() =>
+      state.value ? state.value.displayDefs.find((d) => d.id === tab.value) : null);
+
+    const display = computed(() =>
+      state.value && currentDef.value ? state.value.displays[tab.value] : null);
+
+    const setRule = (key, value) => socket.emit('rules:set', { [key]: value });
+
+    function isMaxed(c) {
+      const s = state.value;
+      if (!s) return false;
+      const limit = s.rules[c.max];
+      return s.home[c.kind] >= limit || s.away[c.kind] >= limit;
+    }
+
+    function setVisible(kind, val) {
+      socket.emit('rules:set', { counterDisplay: { [kind]: { visible: val } } });
+    }
+
+    function setMode(kind, val) {
+      socket.emit('rules:set', { counterDisplay: { [kind]: { mode: val ? 'used' : 'remaining' } } });
+    }
+
+    const setDisplay = (patch) => socket.emit('display:set', { id: tab.value, patch });
+    const setBlock = (key, val) => setDisplay({ blocks: { [key]: val } });
+
+    function setCounterStyle(val) {
+      setBlock('counter', { style: val ? 'lamp' : 'number' });
+    }
+
+    function resetMatch() {
+      if (confirm('試合を最初からやり直します。スコアとセット結果が消えます。よろしいですか？')) {
+        socket.emit('match:reset');
+      }
+    }
+
+    return { state, connected, fonts, tab, currentDef, display,
+             counterDefs: COUNTER_DEFS, blockDefs: BLOCK_DEFS,
+             setRule, isMaxed, setVisible, setMode, setDisplay, setBlock, setCounterStyle, resetMatch };
+  }
+})
+.component('stepper', Stepper)
+.component('toggle-switch', ToggleSwitch)
+.mount('#app');
+</script>
+</body>
+</html>

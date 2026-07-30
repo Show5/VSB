@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スコアシステム</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/vue.global.js"></script>
+<link rel="stylesheet" href="/panel.css">
+<style>
+  h1 { font-size: 1.3rem; font-weight: normal; color: var(--dim); }
+  ul { list-style: none; padding: 0; max-width: 640px; }
+  li { margin-bottom: 0.5rem; }
+  li a { display: block; padding: 1rem; background: var(--panel); border-radius: 8px;
+         color: var(--text); text-decoration: none; border: 1px solid var(--line); }
+  li a:hover { border-color: var(--home); }
+  li small { display: block; color: var(--dim); margin-top: 0.25rem; }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <h1>バレーボール スコアシステム</h1>
+  <ul>
+    <li><a href="/input.html">得点入力<small>試合中の操作</small></a></li>
+    <li><a href="/config.html">設定<small>試合設定・表示の管理</small></a></li>
+    <li v-for="o in outputs" :key="o.file">
+      <a :href="'/' + o.file">表示：{{ o.label }}<small>{{ o.file }}</small></a>
+    </li>
+  </ul>
+</div>
+<script>
+const { createApp, ref } = Vue;
+createApp({
+  setup() {
+    const outputs = ref([]);
+    const socket = io();
+    socket.on('state', (s) => { outputs.value = s.outputs; });
+    return { outputs };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
