@@ -32,7 +32,17 @@
   .block h3 { margin: 0 0 0.7rem; font-size: 0.95rem; font-weight: normal; color: var(--text); }
   .block .row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
   .block .row > label { flex: 0 1 4rem; min-width: 3.5rem; font-size: 0.9rem; color: var(--dim); }
-  .block input[type=range] { flex: 1 1 120px; min-width: 100px; }
+  .block select { flex: 1 1 160px; min-width: 140px; }
+
+  .block-body { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+  .block-font-col { flex: 1 1 220px; min-width: 200px; }
+  .block-pos-col { flex: 0 0 auto; }
+
+  .block-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
+    gap: 1rem;
+  }
 
   .danger { background: var(--danger); border-color: #991b1b; padding: 0.9rem 1.5rem; font-size: 1rem; }
 
@@ -41,6 +51,9 @@
   .stepper .val {
     min-width: 3rem; text-align: center; font-size: 1.15rem;
     font-variant-numeric: tabular-nums;
+  }
+  .stepper .reset {
+    width: auto; height: 2.4rem; padding: 0 0.7rem; font-size: 0.8rem; font-weight: normal;
   }
 
   .counter-row { flex-wrap: wrap; }
@@ -68,6 +81,60 @@
   }
   .switch.on  .switch-knob { left: 87px; }
   .switch.off .switch-knob { left: 3px; }
+
+  .pos-section-label { font-size: 0.9rem; color: var(--dim); margin-bottom: 0.4rem; }
+  .pos-step { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
+  .pos-step-label { font-size: 0.82rem; color: var(--dim); }
+  .pos-step select { width: auto; padding: 0.35rem 0.5rem; font-size: 0.85rem; }
+
+  .dpad {
+    display: grid;
+    grid-template-columns: 56px 56px 56px;
+    grid-template-rows: 56px 56px 56px;
+    gap: 8px;
+    width: 188px;
+  }
+  .dpad-btn {
+    width: 56px; height: 56px; border-radius: 14px;
+    background: #0f1115; border: 1px solid var(--line); color: var(--text);
+    font-size: 1.4rem; line-height: 1; display: flex;
+    align-items: center; justify-content: center; cursor: pointer;
+  }
+  .dpad-btn:active { background: #343842; }
+  .dpad-up     { grid-column: 2; grid-row: 1; }
+  .dpad-left   { grid-column: 1; grid-row: 2; }
+  .dpad-center { grid-column: 2; grid-row: 2; }
+  .dpad-right  { grid-column: 3; grid-row: 2; }
+  .dpad-down   { grid-column: 2; grid-row: 3; }
+  .dpad-reset {
+    font-size: 0.72rem; font-weight: normal; line-height: 1.2;
+    padding: 2px; text-align: center; word-break: keep-all;
+  }
+
+  .pos-readout {
+    width: 188px; text-align: center; margin-top: 0.6rem;
+    font-size: 0.82rem; color: var(--dim); font-variant-numeric: tabular-nums;
+  }
+
+  .color-picker { margin-top: 0.7rem; }
+  .color-picker-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+  .color-swatch { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--line); flex-shrink: 0; }
+  .color-hex { font-size: 0.82rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .color-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem; }
+  .color-row label {
+    width: 1.1rem; font-size: 0.82rem; font-weight: bold; text-align: center; flex-shrink: 0;
+  }
+  .color-row.r label { color: #ff6b6b; }
+  .color-row.g label { color: #51cf66; }
+  .color-row.b label { color: #4dabf7; }
+  .color-row input[type=range] { flex: 1 1 auto; min-width: 90px; }
+  .color-row .color-val {
+    width: 2.6rem; text-align: right; font-size: 0.8rem; color: var(--dim);
+    font-variant-numeric: tabular-nums; flex-shrink: 0;
+  }
+  .color-row.r input[type=range] { accent-color: #ff6b6b; }
+  .color-row.g input[type=range] { accent-color: #51cf66; }
+  .color-row.b input[type=range] { accent-color: #4dabf7; }
 </style>
 </head>
 <body>
@@ -155,65 +222,54 @@
       <template v-else-if="display">
         <div class="card">
           <h2>{{ currentDef.label }}</h2>
-          <div class="field">
-            <label>フォント</label>
-            <select :value="display.font" @change="setDisplay({ font: $event.target.value })">
-              <option value="system">システム標準</option>
-              <option v-for="f in fonts" :key="f.file" :value="f.file">{{ f.name }}</option>
-            </select>
-          </div>
-          <p class="hint" v-if="!fonts.length">
-            server/public/fonts/ に .woff2 / .otf / .ttf を置くと選択肢に出ます。
-          </p>
           <p class="hint">
             確認用:
             <a :href="'/' + currentDef.file" target="_blank"
                style="color:var(--dim)">{{ currentDef.file }} を開く</a>
           </p>
+          <p class="hint" style="margin-bottom:0">
+            フォントは項目ごとに個別に設定できます。
+            server/public/fonts/ に .woff2 / .otf / .ttf を置くと選択肢に出ます
+            (フォルダに分けて置いても構いません)。
+          </p>
         </div>
 
         <div class="card card-full">
           <h2>ブロックごとの調整</h2>
-          <div v-for="b in blockDefs" :key="b.key" class="block">
-            <h3>{{ b.label }}</h3>
 
-            <div class="row" v-if="b.key === 'counter' && currentDef.counterStyleOption">
-              <label>表示形式</label>
-              <toggle-switch :value="display.blocks.counter.style === 'lamp'"
-                             on-text="ランプ" off-text="数字"
-                             on-color="var(--warn)" off-color="#4b4f58"
-                             @change="setCounterStyle"></toggle-switch>
-              <span class="hint">この画面(パターン)だけの設定です</span>
+          <template v-if="currentDef.id === 'full'">
+            <p class="hint">
+              位置は矢印ボタンで動かします。「チーム名」「得点」「セット結果」は
+              中央から寄せる/広げる形、「タイムアウト、選手交代、チャレンジ」は
+              そのまま左右/上下に動きます。
+            </p>
+            <div class="block-grid-3">
+              <block-editor v-for="b in threePaneDefs" :key="b.key"
+                            :label="b.label" :block="display.blocks[b.key]" :fonts="fonts"
+                            :size-min="b.min" :size-max="b.max" :default-size="b.defaultSize"
+                            @change="setBlock(b.key, $event)"></block-editor>
             </div>
+            <block-editor v-if="counterDef" :label="counterDef.label"
+                          :block="display.blocks[counterDef.key]" :fonts="fonts"
+                          :size-min="counterDef.min" :size-max="counterDef.max"
+                          :default-size="counterDef.defaultSize"
+                          :show-style="currentDef.counterStyleOption"
+                          @change="setBlock(counterDef.key, $event)"></block-editor>
+          </template>
 
-            <div class="row">
-              <label>サイズ</label>
-              <input type="range" :min="b.min" :max="b.max" step="2"
-                     :value="display.blocks[b.key].size"
-                     @input="setBlock(b.key, { size: Number($event.target.value) })">
-              <input type="number" :min="b.min" :max="b.max"
-                     :value="display.blocks[b.key].size"
-                     @change="setBlock(b.key, { size: Number($event.target.value) })">
+          <template v-else-if="currentDef.id === 'result'">
+            <p class="hint">
+              位置は矢印ボタンで動かします。「チーム名(短縮)」「獲得セット数」「セット結果表」は
+              すべて中央から寄せる/広げる形で動きます。この画面は disp-full.html /
+              disp-full-flip.html とは独立した設定です(互いに影響しません)。
+            </p>
+            <div class="block-grid-3">
+              <block-editor v-for="b in resultBlockDefs" :key="b.key"
+                            :label="b.label" :block="display.blocks[b.key]" :fonts="fonts"
+                            :size-min="b.min" :size-max="b.max" :default-size="b.defaultSize"
+                            @change="setBlock(b.key, $event)"></block-editor>
             </div>
-            <div class="row">
-              <label>横位置</label>
-              <input type="range" min="-400" max="400" step="2"
-                     :value="display.blocks[b.key].x"
-                     @input="setBlock(b.key, { x: Number($event.target.value) })">
-              <input type="number" min="-400" max="400"
-                     :value="display.blocks[b.key].x"
-                     @change="setBlock(b.key, { x: Number($event.target.value) })">
-            </div>
-            <div class="row">
-              <label>縦位置</label>
-              <input type="range" min="-400" max="400" step="2"
-                     :value="display.blocks[b.key].y"
-                     @input="setBlock(b.key, { y: Number($event.target.value) })">
-              <input type="number" min="-400" max="400"
-                     :value="display.blocks[b.key].y"
-                     @change="setBlock(b.key, { y: Number($event.target.value) })">
-            </div>
-          </div>
+          </template>
         </div>
       </template>
     </div>
@@ -229,20 +285,29 @@ const COUNTER_DEFS = [
   { kind: 'challenges', label: 'チャレンジ',   max: 'challengesPerSet', cap: 9 }
 ];
 
-const BLOCK_DEFS = [
-  { key: 'name',    label: 'チーム名',                         min: 20, max: 200 },
-  { key: 'score',   label: '得点',                             min: 60, max: 700 },
-  { key: 'result',  label: 'セット結果',                       min: 20, max: 300 },
-  { key: 'counter', label: 'タイムアウト、選手交代、チャレンジ', min: 20, max: 300 }
+// defaultSize は state.js の BLOCK_PRESETS.full の初期値と一致させている
+const FULL_BLOCK_DEFS = [
+  { key: 'name',    label: 'チーム名',                         min: 20, max: 200, defaultSize: 76 },
+  { key: 'score',   label: '得点',                             min: 60, max: 700, defaultSize: 410 },
+  { key: 'result',  label: 'セット結果',                       min: 20, max: 300, defaultSize: 124 },
+  { key: 'counter', label: 'タイムアウト、選手交代、チャレンジ', min: 20, max: 300, defaultSize: 124 }
+];
+
+// defaultSize は state.js の BLOCK_PRESETS.result の初期値と一致させている
+const RESULT_BLOCK_DEFS = [
+  { key: 'name',    label: 'チーム名（短縮）', min: 20, max: 200, defaultSize: 64 },
+  { key: 'setsWon', label: '獲得セット数',     min: 40, max: 500, defaultSize: 160 },
+  { key: 'table',   label: 'セット結果表',     min: 20, max: 200, defaultSize: 56 }
 ];
 
 const Stepper = {
   props: {
-    value:  { type: Number, required: true },
-    min:    { type: Number, default: 0 },
-    max:    { type: Number, default: 99 },
-    step:   { type: Number, default: 1 },
-    suffix: { type: String, default: '' }
+    value:      { type: Number, required: true },
+    min:        { type: Number, default: 0 },
+    max:        { type: Number, default: 99 },
+    step:       { type: Number, default: 1 },
+    suffix:     { type: String, default: '' },
+    resetValue: { type: Number, default: null }
   },
   emits: ['change'],
   template: `
@@ -253,6 +318,9 @@ const Stepper = {
       <button type="button" :disabled="value >= max"
               @click="$emit('change', Math.min(max, value + step))">+</button>
       <span v-if="suffix" class="unit">{{ suffix }}</span>
+      <button v-if="resetValue !== null" type="button" class="reset"
+              :disabled="value === resetValue"
+              @click="$emit('change', resetValue)">リセット</button>
     </div>
   `
 };
@@ -276,6 +344,136 @@ const ToggleSwitch = {
   `
 };
 
+const PositionDPad = {
+  props: {
+    x:     { type: Number, required: true },
+    y:     { type: Number, required: true },
+    range: { type: Number, default: 400 }
+  },
+  emits: ['change'],
+  data() {
+    return { step: 1 };
+  },
+  methods: {
+    clamp(v) { return Math.min(this.range, Math.max(-this.range, v)); },
+    move(dx, dy) {
+      this.$emit('change', { x: this.clamp(this.x + dx), y: this.clamp(this.y + dy) });
+    },
+    reset() {
+      this.$emit('change', { x: 0, y: 0 });
+    }
+  },
+  template: `
+    <div>
+      <div class="pos-step">
+        <span class="pos-step-label">移動量</span>
+        <select v-model.number="step">
+          <option :value="1">1px</option>
+          <option :value="10">10px</option>
+          <option :value="100">100px</option>
+        </select>
+      </div>
+      <div class="dpad">
+        <button type="button" class="dpad-btn dpad-up"     @click="move(0, -step)">▲</button>
+        <button type="button" class="dpad-btn dpad-left"   @click="move(-step, 0)">◀</button>
+        <button type="button" class="dpad-btn dpad-center dpad-reset" @click="reset">リセット</button>
+        <button type="button" class="dpad-btn dpad-right"  @click="move(step, 0)">▶</button>
+        <button type="button" class="dpad-btn dpad-down"   @click="move(0, step)">▼</button>
+      </div>
+      <div class="pos-readout">x: {{ x }} / y: {{ y }}</div>
+    </div>
+  `
+};
+
+function toHex2(n) {
+  return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+}
+function rgbOf(hex) {
+  const m = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(hex || '#000000');
+  if (!m) return { r: 0, g: 0, b: 0 };
+  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+}
+
+const BlockEditor = {
+  components: { stepper: Stepper, 'toggle-switch': ToggleSwitch, 'position-dpad': PositionDPad },
+  props: {
+    label:       { type: String, required: true },
+    block:       { type: Object, required: true },
+    fonts:       { type: Array,  default: () => [] },
+    sizeMin:     { type: Number, default: 20 },
+    sizeMax:     { type: Number, default: 300 },
+    defaultSize: { type: Number, required: true },
+    showStyle:   { type: Boolean, default: false }
+  },
+  emits: ['change'],
+  computed: {
+    rgb() { return rgbOf(this.block.color); }
+  },
+  methods: {
+    onColor(channel, value) {
+      const cur = { ...this.rgb };
+      cur[channel] = Number(value);
+      this.$emit('change', { color: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
+    }
+  },
+  template: `
+    <div class="block">
+      <h3>{{ label }}</h3>
+      <div class="block-body">
+        <div class="block-font-col">
+          <div class="row">
+            <label>フォント</label>
+            <select :value="block.font" @change="$emit('change', { font: $event.target.value })">
+              <option value="system">システム標準</option>
+              <option v-for="f in fonts" :key="f.file" :value="f.file">{{ f.name }}</option>
+            </select>
+          </div>
+
+          <div class="row" v-if="showStyle">
+            <label>表示形式</label>
+            <toggle-switch :value="block.style === 'lamp'" on-text="ランプ" off-text="数字"
+                           on-color="var(--warn)" off-color="#4b4f58"
+                           @change="$emit('change', { style: $event ? 'lamp' : 'number' })"></toggle-switch>
+          </div>
+
+          <div class="row">
+            <label>サイズ</label>
+            <stepper :value="block.size" :min="sizeMin" :max="sizeMax" :step="2" suffix="px"
+                     :reset-value="defaultSize" @change="$emit('change', { size: $event })"></stepper>
+          </div>
+
+          <div class="color-picker">
+            <div class="color-picker-head">
+              <div class="color-swatch" :style="{ background: block.color }"></div>
+              <span class="color-hex">{{ block.color }}</span>
+            </div>
+            <div class="color-row r">
+              <label>R</label>
+              <input type="range" min="0" max="255" :value="rgb.r" @input="onColor('r', $event.target.value)">
+              <span class="color-val">{{ rgb.r }}</span>
+            </div>
+            <div class="color-row g">
+              <label>G</label>
+              <input type="range" min="0" max="255" :value="rgb.g" @input="onColor('g', $event.target.value)">
+              <span class="color-val">{{ rgb.g }}</span>
+            </div>
+            <div class="color-row b">
+              <label>B</label>
+              <input type="range" min="0" max="255" :value="rgb.b" @input="onColor('b', $event.target.value)">
+              <span class="color-val">{{ rgb.b }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="block-pos-col">
+          <div class="pos-section-label">位置</div>
+          <position-dpad :x="block.x" :y="block.y" @change="$emit('change', $event)"></position-dpad>
+        </div>
+      </div>
+    </div>
+  `
+};
+
 createApp({
   setup() {
     const state = ref(null);
@@ -295,6 +493,10 @@ createApp({
 
     const display = computed(() =>
       state.value && currentDef.value ? state.value.displays[tab.value] : null);
+
+    const threePaneDefs = computed(() => FULL_BLOCK_DEFS.filter((b) => b.key !== 'counter'));
+    const counterDef = computed(() => FULL_BLOCK_DEFS.find((b) => b.key === 'counter'));
+    const resultBlockDefs = RESULT_BLOCK_DEFS;
 
     const setRule = (key, value) => socket.emit('rules:set', { [key]: value });
 
@@ -316,10 +518,6 @@ createApp({
     const setDisplay = (patch) => socket.emit('display:set', { id: tab.value, patch });
     const setBlock = (key, val) => setDisplay({ blocks: { [key]: val } });
 
-    function setCounterStyle(val) {
-      setBlock('counter', { style: val ? 'lamp' : 'number' });
-    }
-
     function resetMatch() {
       if (confirm('試合を最初からやり直します。スコアとセット結果が消えます。よろしいですか？')) {
         socket.emit('match:reset');
@@ -327,12 +525,14 @@ createApp({
     }
 
     return { state, connected, fonts, tab, currentDef, display,
-             counterDefs: COUNTER_DEFS, blockDefs: BLOCK_DEFS,
-             setRule, isMaxed, setVisible, setMode, setDisplay, setBlock, setCounterStyle, resetMatch };
+             counterDefs: COUNTER_DEFS, threePaneDefs, counterDef, resultBlockDefs,
+             setRule, isMaxed, setVisible, setMode, setDisplay, setBlock, resetMatch };
   }
 })
 .component('stepper', Stepper)
 .component('toggle-switch', ToggleSwitch)
+.component('position-dpad', PositionDPad)
+.component('block-editor', BlockEditor)
 .mount('#app');
 </script>
 </body>

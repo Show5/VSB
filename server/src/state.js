@@ -1,6 +1,6 @@
 import { writeFile, readFile, rename, mkdir, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, extname, basename } from 'node:path';
+import { dirname, join, extname, basename, relative, sep } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
@@ -9,19 +9,19 @@ const FONT_DIR = join(__dirname, '..', 'public', 'fonts');
 
 const FONT_EXT = ['.woff2', '.woff', '.otf', '.ttf'];
 
-// 調整データを持つ単位。config.html の「表示の管理」タブはここから作られる。
-// 増やすときはここに1行足す
+// 表示パターン(設定グループ)の定義。1つの設定グループを複数の出力ページで
+// 共有できる(OUTPUTS 側の styleOf で指定)。config.html のサイドバーは
+// この配列の順で並ぶ
 export const DISPLAYS = [
-  { id: 'full', file: 'disp-full.html', label: 'フルスクリーン', counterStyleOption: false }
+  { id: 'full',   file: 'disp-full.html',   label: 'フルスクリーン', counterStyleOption: false },
+  { id: 'result', file: 'disp-result.html', label: '試合結果',       counterStyleOption: false }
 ];
 
-// 実際に開けるページの一覧。index.html の入口はここから作られる。
-// styleOf で、どの DISPLAYS の調整データを使うかを指す。
-// 見た目の項目(位置・サイズ・フォント)を共有したいページは
-// 同じ styleOf を指定すれば、個別の調整タブを持たずに済む
+// 実際に開けるページの一覧。入口(index.html)はここから作られる
 export const OUTPUTS = [
   { file: 'disp-full.html',      label: 'フルスクリーン',           styleOf: 'full' },
-  { file: 'disp-full-flip.html', label: 'フルスクリーン(左右反転)', styleOf: 'full' }
+  { file: 'disp-full-flip.html', label: 'フルスクリーン(左右反転)', styleOf: 'full' },
+  { file: 'disp-result.html',    label: '試合結果',                 styleOf: 'result' }
 ];
 
 const RULES = {
@@ -38,25 +38,36 @@ const RULES = {
   }
 };
 
-export function createDisplay() {
-  return {
-    font: 'system',
-    blocks: {
-      name:    { x: 0, y: 0, size: 76 },
-      score:   { x: 0, y: 0, size: 410 },
-      result:  { x: 0, y: 0, size: 124 },
-      counter: { x: 0, y: 0, size: 124, style: 'number' }
-    }
-  };
+// 表示パターンごとに持つブロックの形が違う(フルスクリーンは4項目、
+// 試合結果は3項目)。id ごとのひな形をここにまとめて持たせる
+const BLOCK_PRESETS = {
+  full: {
+    name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
+    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000' },
+    result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
+    counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
+  },
+  result: {
+    name:    { x: 0, y: 0, size: 64,  font: 'system', color: '#000000' },
+    setsWon: { x: 0, y: 0, size: 160, font: 'system', color: '#000000' },
+    table:   { x: 0, y: 0, size: 56,  font: 'system', color: '#000000' }
+  }
+};
+
+export function createDisplay(id) {
+  const preset = BLOCK_PRESETS[id] || BLOCK_PRESETS.full;
+  return { blocks: JSON.parse(JSON.stringify(preset)) };
 }
 
+// shortName: チーム名の短縮版。空文字が既定で、未設定なら通常の name を使う
+// (どちらを使うかは表示ページ側の判断)
 function createTeam(name) {
-  return { name, score: 0, setsWon: 0, timeouts: 0, subs: 0, challenges: 0 };
+  return { name, shortName: '', score: 0, setsWon: 0, timeouts: 0, subs: 0, challenges: 0 };
 }
 
 export function createInitialState() {
   const displays = {};
-  for (const d of DISPLAYS) displays[d.id] = createDisplay();
+  for (const d of DISPLAYS) displays[d.id] = createDisplay(d.id);
 
   return {
     currentSet: 1,
@@ -88,10 +99,17 @@ export function targetScore(state) {
 
 export async function listFonts() {
   try {
-    const files = await readdir(FONT_DIR);
-    return files
-      .filter((f) => FONT_EXT.includes(extname(f).toLowerCase()))
-      .map((f) => ({ file: f, name: basename(f, extname(f)) }))
+    const entries = await readdir(FONT_DIR, { recursive: true, withFileTypes: true });
+    return entries
+      .filter((e) => e.isFile() && FONT_EXT.includes(extname(e.name).toLowerCase()))
+      .map((e) => {
+        const parentDir = e.parentPath ?? e.path;
+        const relDir = relative(FONT_DIR, parentDir);
+        const relPath = relDir ? join(relDir, e.name) : e.name;
+        const urlPath = relPath.split(sep).join('/');
+        const withoutExt = urlPath.slice(0, -extname(urlPath).length);
+        return { file: urlPath, name: withoutExt.split('/').join(' / ') };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
@@ -135,13 +153,10 @@ export async function load() {
   } catch {
     console.log('新規の試合状態で開始します');
   }
-  // displayDefs / outputs は常にコード側の最新定義を使う。
-  // 保存データに古い fullFlip 用の設定が残っていても、
-  // fillMissing の時点で base(=最新のDISPLAYS)に無いキーとして自動的に落ちる
   state.displayDefs = DISPLAYS;
   state.outputs = OUTPUTS;
   for (const d of DISPLAYS) {
-    if (!state.displays[d.id]) state.displays[d.id] = createDisplay();
+    if (!state.displays[d.id]) state.displays[d.id] = createDisplay(d.id);
   }
   return state;
 }

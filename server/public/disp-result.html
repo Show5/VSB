@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>表示：フルスクリーン</title>
+<title>表示：試合結果</title>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/vendor/vue.global.js"></script>
 <style>
@@ -17,17 +17,15 @@
   }
   #stage.ready { opacity: 1; }
   .abs { position: absolute; display: flex; }
-  .name { width: 792px; height: 165px; align-items: center; justify-content: center;
+  .name { width: 740px; height: 180px; align-items: center; justify-content: center;
           font-weight: 700; line-height: 1.15; text-align: center;
-          overflow: hidden; word-break: break-word; white-space: pre-line; }
-  .score { width: 429px; height: 420px; align-items: center; justify-content: center;
-           font-weight: 800; line-height: 1; }
-  .dash { width: 127px; height: 31px; }
-  .result-num { width: 138px; height: 90px; align-items: center; justify-content: center;
-                font-weight: 700; line-height: 1; }
-  .result-dash { width: 38px; height: 9px; }
-  .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
-             font-weight: 700; line-height: 1; }
+          overflow: hidden; word-break: break-word; }
+  .setsnum { width: 280px; height: 240px; align-items: center; justify-content: center;
+             font-weight: 800; line-height: 1; }
+  .setsdash { width: 80px; height: 16px; }
+  .rownum { width: 220px; height: 64px; align-items: center; justify-content: center;
+            font-weight: 700; line-height: 1; }
+  .rowdash { width: 60px; height: 10px; }
 </style>
 </head>
 <body>
@@ -36,25 +34,17 @@
   <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
     <template v-if="state">
 
-      <div class="abs name" :style="spreadPos(140, 'left', 39, 'name')">{{ state.home.name }}</div>
-      <div class="abs name" :style="spreadPos(980, 'right', 39, 'name')">{{ state.away.name }}</div>
+      <div class="abs name" :style="spreadPos(100, 'left', 70, 'name')">{{ displayName('home') }}</div>
+      <div class="abs name" :style="spreadPos(1080, 'right', 70, 'name')">{{ displayName('away') }}</div>
 
-      <div class="abs score" :style="spreadPos(327, 'left', 180, 'score')">{{ state.home.score }}</div>
-      <div class="abs dash"  :style="fixedPos(896, 404, blocks.score.color)"></div>
-      <div class="abs score" :style="spreadPos(1167, 'right', 180, 'score')">{{ state.away.score }}</div>
-
-      <div v-for="c in counters" :key="c.key" class="abs counter"
-           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
-        {{ c.value }}
-      </div>
+      <div class="abs setsnum" :style="spreadPos(640, 'left', 340, 'setsWon')">{{ state.home.setsWon }}</div>
+      <div class="abs setsdash" :style="fixedPos(920, 452, blocks.setsWon.color)"></div>
+      <div class="abs setsnum" :style="spreadPos(1000, 'right', 340, 'setsWon')">{{ state.away.setsWon }}</div>
 
       <template v-for="(r, i) in results" :key="i">
-        <div class="abs result-num"
-             :style="spreadPos(798.5, 'left', 610 + i * 108, 'result')">{{ r.home }}</div>
-        <div class="abs result-dash"
-             :style="fixedPos(941, 610 + i * 108 + 40.5, blocks.result.color)"></div>
-        <div class="abs result-num"
-             :style="spreadPos(983.5, 'right', 610 + i * 108, 'result')">{{ r.away }}</div>
+        <div class="abs rownum" :style="spreadPos(710, 'left', 640 + i * 84, 'table')">{{ r.home }}</div>
+        <div class="abs rowdash" :style="fixedPos(930, 640 + i * 84 + 27, blocks.table.color)"></div>
+        <div class="abs rownum" :style="spreadPos(990, 'right', 640 + i * 84, 'table')">{{ r.away }}</div>
       </template>
 
     </template>
@@ -64,16 +54,9 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 
-const DISPLAY_ID = 'full';
+const DISPLAY_ID = 'result';
 const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
-const COUNTERS = [
-  { kind: 'timeouts',   max: 'timeoutsPerSet',   top: 634 },
-  { kind: 'subs',       max: 'subsPerSet',       top: 774 },
-  { kind: 'challenges', max: 'challengesPerSet', top: 914 }
-];
-const COL_X = { home: 50, away: 1687 };
-const MAX_COLOR = '#ef4444';
-const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
+const BLOCK_KEYS = ['name', 'setsWon', 'table'];
 
 createApp({
   setup() {
@@ -91,20 +74,7 @@ createApp({
       return `"disp-font-${key}", ${SYSTEM_STACK}`;
     }
 
-    // タイムアウト等(counter)専用。今まで通り、そのまま平行移動する
-    function pos(left, top, key) {
-      const b = blocks.value[key];
-      return {
-        left: (left + b.x) + 'px',
-        top: (top + b.y) + 'px',
-        fontSize: b.size + 'px',
-        fontFamily: fontFamilyFor(key),
-        color: b.color
-      };
-    }
-
-    // チーム名・得点・セット結果 専用。
-    // slot: 'left'(画面左側の要素) / 'right'(画面右側の要素)
+    // slot: 'left'(HOME側) / 'right'(AWAY側)。x は中央からの距離として扱う
     function spreadPos(baseLeft, slot, baseTop, key) {
       const b = blocks.value[key];
       const dx = slot === 'left' ? -b.x : b.x;
@@ -117,7 +87,7 @@ createApp({
       };
     }
 
-    // ハイフン専用。位置は固定だが、色はそのブロックの色に合わせる
+    // ハイフン専用。位置は固定、色だけ隣接するブロックに合わせる
     function fixedPos(left, top, color) {
       return { left: left + 'px', top: top + 'px', background: color };
     }
@@ -154,30 +124,15 @@ createApp({
       el.textContent = rules.join('\n');
     }
 
-    const results = computed(() =>
-      state.value ? state.value.setResults.slice(0, 4) : []);
-
-    const counters = computed(() => {
+    // 短縮名が未設定ならチーム名にフォールバック(この画面だけの挙動)
+    function displayName(team) {
       const s = state.value;
-      if (!s) return [];
-      const list = [];
-      for (const team of ['home', 'away']) {
-        for (const c of COUNTERS) {
-          const cd = s.rules.counterDisplay[c.kind];
-          if (!cd.visible) continue;
-          const used = s[team][c.kind];
-          const max = s.rules[c.max];
-          list.push({
-            key: team + c.kind,
-            left: COL_X[team],
-            top: c.top,
-            value: cd.mode === 'used' ? used : max - used,
-            maxed: used >= max
-          });
-        }
-      }
-      return list;
-    });
+      if (!s) return '';
+      return s[team].shortName || s[team].name;
+    }
+
+    // 確定済みのセットをすべて表示する(件数の上限なし)
+    const results = computed(() => state.value ? state.value.setResults : []);
 
     function fit() {
       scale.value = Math.min(window.innerWidth / 1920, window.innerHeight / 1080, 1);
@@ -193,7 +148,7 @@ createApp({
 
     onMounted(() => { fit(); window.addEventListener('resize', fit); });
 
-    return { state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, MAX_COLOR };
+    return { state, blocks, visible, scale, results, spreadPos, fixedPos, displayName };
   }
 }).mount('#app');
 </script>

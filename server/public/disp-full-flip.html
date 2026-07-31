@@ -11,7 +11,7 @@
                background: transparent; overflow: hidden; }
   #stage {
     position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
-    transform-origin: top left; color: #000;
+    transform-origin: top left;
     font-variant-numeric: tabular-nums;
     opacity: 0; transition: opacity 0.4s ease;
   }
@@ -22,13 +22,10 @@
           overflow: hidden; word-break: break-word; white-space: pre-line; }
   .score { width: 429px; height: 420px; align-items: center; justify-content: center;
            font-weight: 800; line-height: 1; }
-  .dash { width: 127px; height: 31px; background: #000; }
-  .result { width: 369px; height: 90px; align-items: center; justify-content: center;
-            font-weight: 700; line-height: 1; }
-  .result .n { width: 138px; text-align: center; }
-  .result .n + .n { margin-left: 24px; }
-  .result .sep { width: 47px; display: flex; align-items: center; justify-content: center; }
-  .result .sep i { display: block; width: 38px; height: 9px; background: #000; }
+  .dash { width: 127px; height: 31px; }
+  .result-num { width: 138px; height: 90px; align-items: center; justify-content: center;
+                font-weight: 700; line-height: 1; }
+  .result-dash { width: 38px; height: 9px; }
   .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
              font-weight: 700; line-height: 1; }
 </style>
@@ -36,29 +33,30 @@
 <body>
 
 <div id="app" v-cloak>
-  <div id="stage" :class="{ ready: visible }"
-       :style="{ transform: `scale(${scale})`, fontFamily: fontStack }">
+  <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
     <template v-if="state">
 
       <!-- 左スロットに away、右スロットに home を描画する(通常版と逆) -->
-      <div class="abs name" :style="pos(140, 39, 'name')">{{ state[LEFT].name }}</div>
-      <div class="abs name" :style="pos(980, 39, 'name')">{{ state[RIGHT].name }}</div>
+      <div class="abs name" :style="spreadPos(140, 'left', 39, 'name')">{{ state[LEFT].name }}</div>
+      <div class="abs name" :style="spreadPos(980, 'right', 39, 'name')">{{ state[RIGHT].name }}</div>
 
-      <div class="abs score" :style="pos(327, 180, 'score')">{{ state[LEFT].score }}</div>
-      <div class="abs dash"  :style="pos(896, 404, 'score')"></div>
-      <div class="abs score" :style="pos(1167, 180, 'score')">{{ state[RIGHT].score }}</div>
+      <div class="abs score" :style="spreadPos(327, 'left', 180, 'score')">{{ state[LEFT].score }}</div>
+      <div class="abs dash"  :style="fixedPos(896, 404, blocks.score.color)"></div>
+      <div class="abs score" :style="spreadPos(1167, 'right', 180, 'score')">{{ state[RIGHT].score }}</div>
 
       <div v-for="c in counters" :key="c.key" class="abs counter"
-           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : 'inherit' }">
+           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
         {{ c.value }}
       </div>
 
-      <div v-for="(r, i) in results" :key="i" class="abs result"
-           :style="pos(775.5, 610 + i * 108, 'result')">
-        <div class="n">{{ r[LEFT] }}</div>
-        <div class="sep"><i></i></div>
-        <div class="n">{{ r[RIGHT] }}</div>
-      </div>
+      <template v-for="(r, i) in results" :key="i">
+        <div class="abs result-num"
+             :style="spreadPos(798.5, 'left', 610 + i * 108, 'result')">{{ r[LEFT] }}</div>
+        <div class="abs result-dash"
+             :style="fixedPos(941, 610 + i * 108 + 40.5, blocks.result.color)"></div>
+        <div class="abs result-num"
+             :style="spreadPos(983.5, 'right', 610 + i * 108, 'result')">{{ r[RIGHT] }}</div>
+      </template>
 
     </template>
   </div>
@@ -67,10 +65,10 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 
-const DISPLAY_ID = 'full'; // disp-full.html と同じ調整データを共有する
+// disp-full.html と同じ調整データ(state.displays.full)を共有する
+const DISPLAY_ID = 'full';
 const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
 
-// この画面だけ、左右のチームを通常版(disp-full.html)と入れ替える
 const LEFT = 'away';
 const RIGHT = 'home';
 
@@ -79,9 +77,9 @@ const COUNTERS = [
   { kind: 'subs',       max: 'subsPerSet',       top: 774 },
   { kind: 'challenges', max: 'challengesPerSet', top: 914 }
 ];
-// カウンター欄の左右も LEFT/RIGHT に合わせる(HOME/AWAY固定ではなく)
 const COL_X = { [LEFT]: 50, [RIGHT]: 1687 };
 const MAX_COLOR = '#ef4444';
+const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
 createApp({
   setup() {
@@ -93,26 +91,10 @@ createApp({
     const blocks = computed(() => conf.value ? conf.value.blocks : null);
     const visible = computed(() => connected.value && state.value !== null);
 
-    const fontStack = computed(() => {
-      const font = conf.value ? conf.value.font : 'system';
-      if (!font || font === 'system') return SYSTEM_STACK;
-      applyFontFace(font);
-      return `"disp-custom", ${SYSTEM_STACK}`;
-    });
-
-    let loadedFont = null;
-    function applyFontFace(file) {
-      if (loadedFont === file) return;
-      loadedFont = file;
-      let el = document.getElementById('font-face');
-      if (!el) {
-        el = document.createElement('style');
-        el.id = 'font-face';
-        document.head.appendChild(el);
-      }
-      el.textContent =
-        `@font-face { font-family: "disp-custom"; font-display: block;` +
-        ` src: url("/fonts/${encodeURIComponent(file)}"); }`;
+    function fontFamilyFor(key) {
+      const b = blocks.value[key];
+      if (!b || !b.font || b.font === 'system') return SYSTEM_STACK;
+      return `"disp-font-${key}", ${SYSTEM_STACK}`;
     }
 
     function pos(left, top, key) {
@@ -120,8 +102,58 @@ createApp({
       return {
         left: (left + b.x) + 'px',
         top: (top + b.y) + 'px',
-        fontSize: b.size + 'px'
+        fontSize: b.size + 'px',
+        fontFamily: fontFamilyFor(key),
+        color: b.color
       };
+    }
+
+    function spreadPos(baseLeft, slot, baseTop, key) {
+      const b = blocks.value[key];
+      const dx = slot === 'left' ? -b.x : b.x;
+      return {
+        left: (baseLeft + dx) + 'px',
+        top: (baseTop + b.y) + 'px',
+        fontSize: b.size + 'px',
+        fontFamily: fontFamilyFor(key),
+        color: b.color
+      };
+    }
+
+    function fixedPos(left, top, color) {
+      return { left: left + 'px', top: top + 'px', background: color };
+    }
+
+    let lastSignature = '';
+    function syncFontFaces() {
+      const b = blocks.value;
+      if (!b) return;
+
+      const rules = [];
+      const sigParts = [];
+      for (const key of BLOCK_KEYS) {
+        const font = b[key].font;
+        sigParts.push(`${key}:${font}`);
+        if (font && font !== 'system') {
+          const encodedPath = font.split('/').map(encodeURIComponent).join('/');
+          rules.push(
+            `@font-face { font-family: "disp-font-${key}"; font-display: block;` +
+            ` src: url("/fonts/${encodedPath}"); }`
+          );
+        }
+      }
+
+      const signature = sigParts.join('|');
+      if (signature === lastSignature) return;
+      lastSignature = signature;
+
+      let el = document.getElementById('font-faces');
+      if (!el) {
+        el = document.createElement('style');
+        el.id = 'font-faces';
+        document.head.appendChild(el);
+      }
+      el.textContent = rules.join('\n');
     }
 
     const results = computed(() =>
@@ -154,13 +186,16 @@ createApp({
     }
 
     const socket = io();
-    socket.on('state', (s) => { state.value = s; });
+    socket.on('state', (s) => {
+      state.value = s;
+      syncFontFaces();
+    });
     socket.on('connect', () => { connected.value = true; });
     socket.on('disconnect', () => { connected.value = false; });
 
     onMounted(() => { fit(); window.addEventListener('resize', fit); });
 
-    return { state, blocks, visible, scale, fontStack, results, counters, pos, LEFT, RIGHT, MAX_COLOR };
+    return { state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, LEFT, RIGHT, MAX_COLOR };
   }
 }).mount('#app');
 </script>

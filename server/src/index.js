@@ -35,6 +35,7 @@ const LIMIT_KEY = {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(v)));
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const isHexColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 const opponentOf = (team) => (team === 'home' ? 'away' : 'home');
 
 io.on('connection', (socket) => {
@@ -45,9 +46,6 @@ io.on('connection', (socket) => {
     if (!TEAMS.includes(team)) return;
 
     if (delta > 0) {
-      // 自チームがすでに目標点に達している場合、相手の得点が
-      // 「自チームの得点-1」以上(=まだデュース状態)でなければ加点を拒否する。
-      // 2点差以上ですでに決着している状態から、得点を積み増せてしまうのを防ぐ
       const target = targetScore(state);
       const myScore = state[team].score;
       const oppScore = state[opponentOf(team)].score;
@@ -98,12 +96,15 @@ io.on('connection', (socket) => {
   socket.on('match:reset', () => {
     const keep = {
       names: { home: state.home.name, away: state.away.name },
+      shortNames: { home: state.home.shortName, away: state.away.shortName },
       rules: state.rules,
       displays: state.displays
     };
     state = createInitialState();
     state.home.name = keep.names.home;
     state.away.name = keep.names.away;
+    state.home.shortName = keep.shortNames.home;
+    state.away.shortName = keep.shortNames.away;
     state.rules = keep.rules;
     state.displays = keep.displays;
     broadcast();
@@ -112,6 +113,12 @@ io.on('connection', (socket) => {
   socket.on('team:rename', ({ team, name }) => {
     if (!TEAMS.includes(team) || typeof name !== 'string') return;
     state[team].name = name.slice(0, 60);
+    broadcast();
+  });
+
+  socket.on('team:shortname', ({ team, shortName }) => {
+    if (!TEAMS.includes(team) || typeof shortName !== 'string') return;
+    state[team].shortName = shortName.slice(0, 10);
     broadcast();
   });
 
@@ -148,8 +155,6 @@ io.on('connection', (socket) => {
     const d = state.displays[id];
     if (!d || !patch || typeof patch !== 'object') return;
 
-    if (typeof patch.font === 'string') d.font = patch.font.slice(0, 80);
-
     if (patch.blocks && typeof patch.blocks === 'object') {
       for (const [key, val] of Object.entries(patch.blocks)) {
         const b = d.blocks[key];
@@ -157,6 +162,8 @@ io.on('connection', (socket) => {
         if (isNum(val.size)) b.size = clamp(val.size, 8, 900);
         if (isNum(val.x))    b.x    = clamp(val.x, -960, 960);
         if (isNum(val.y))    b.y    = clamp(val.y, -540, 540);
+        if (typeof val.font === 'string') b.font = val.font.slice(0, 80);
+        if (isHexColor(val.color)) b.color = val.color;
         if (typeof val.style === 'string' && ['number', 'lamp'].includes(val.style)) {
           b.style = val.style;
         }

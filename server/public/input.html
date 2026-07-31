@@ -18,7 +18,9 @@
   .team.home { border-top-color: var(--home); }
   .team.away { border-top-color: var(--away); }
 
-  .name-row { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem; }
+  .name-label { flex-shrink: 0; width: 3.4rem; font-size: 0.8rem; color: var(--dim);
+                padding-top: 0.55rem; }
+  .name-row { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.5rem; }
   .name-input {
     flex: 1; min-width: 0; min-height: 2.3rem; resize: none; overflow: hidden;
     font-family: inherit; font-size: 1rem; line-height: 1.3;
@@ -27,6 +29,9 @@
   }
   .serve { width: 44px; height: 40px; background: #0f1115; color: var(--dim); font-size: 1.2rem; flex-shrink: 0; }
   .serve.active { background: var(--warn); color: #000; border-color: var(--warn); }
+
+  .short-name-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+  .short-name-input { flex: 1; min-width: 0; }
 
   .score { font-size: 5.5rem; font-weight: 700; text-align: center; line-height: 1; }
   .sets { text-align: center; color: var(--dim); margin-bottom: 0.75rem; }
@@ -84,12 +89,19 @@
 
       <div class="team home">
         <div class="name-row">
+          <label class="name-label">チーム名</label>
           <textarea class="name-input" rows="1" maxlength="60"
                     :value="state.home.name"
                     @input="growAll"
                     @change="send('team:rename', { team: 'home', name: $event.target.value })"></textarea>
           <button class="serve" :class="{ active: state.servingTeam === 'home' }"
                   @click="send('serve:set', { team: 'home' })">S</button>
+        </div>
+        <div class="short-name-row">
+          <label class="name-label">チーム名<br>（短縮）</label>
+          <input type="text" class="short-name-input" maxlength="10"
+                 :value="state.home.shortName"
+                 @change="send('team:shortname', { team: 'home', shortName: $event.target.value })">
         </div>
         <div class="score">{{ state.home.score }}</div>
         <div class="sets">セット {{ state.home.setsWon }}</div>
@@ -131,12 +143,19 @@
 
       <div class="team away">
         <div class="name-row">
+          <label class="name-label">チーム名</label>
           <textarea class="name-input" rows="1" maxlength="60"
                     :value="state.away.name"
                     @input="growAll"
                     @change="send('team:rename', { team: 'away', name: $event.target.value })"></textarea>
           <button class="serve" :class="{ active: state.servingTeam === 'away' }"
                   @click="send('serve:set', { team: 'away' })">S</button>
+        </div>
+        <div class="short-name-row">
+          <label class="name-label">チーム名<br>（短縮）</label>
+          <input type="text" class="short-name-input" maxlength="10"
+                 :value="state.away.shortName"
+                 @change="send('team:shortname', { team: 'away', shortName: $event.target.value })">
         </div>
         <div class="score">{{ state.away.score }}</div>
         <div class="sets">セット {{ state.away.setsWon }}</div>
@@ -215,17 +234,12 @@ createApp({
       return top >= target.value && lead >= 2;
     });
 
-    // そのチームが上限まで使い切っているか(タイムアウト等)
     function isMaxed(team, c) {
       const s = state.value;
       if (!s) return false;
       return s[team][c.kind] >= s.rules[c.max];
     }
 
-    // そのチームが +1 できる状態か。
-    // 自チームがすでに目標点に達していて、かつ相手との差が2点以上ある場合は false。
-    // サーバー側(index.js の score:add)にも同じ判定があり、そちらが最終的な砦。
-    // ここでの判定はボタンの見た目を先回りして揃えるためのもの
     function canAdd(team) {
       const s = state.value;
       if (!s) return false;
