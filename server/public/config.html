@@ -259,7 +259,7 @@
 
           <template v-else-if="currentDef.id === 'result'">
             <p class="hint">
-              位置は矢印ボタンで動かします。「チーム名(短縮)」「獲得セット数」「セット結果表」は
+              位置は矢印ボタンで動かします。「チーム名」「獲得セット数」「セット結果表」は
               すべて中央から寄せる/広げる形で動きます。この画面は disp-full.html /
               disp-full-flip.html とは独立した設定です(互いに影響しません)。
             </p>
@@ -295,9 +295,9 @@ const FULL_BLOCK_DEFS = [
 
 // defaultSize は state.js の BLOCK_PRESETS.result の初期値と一致させている
 const RESULT_BLOCK_DEFS = [
-  { key: 'name',    label: 'チーム名（短縮）', min: 20, max: 200, defaultSize: 64 },
-  { key: 'setsWon', label: '獲得セット数',     min: 40, max: 500, defaultSize: 160 },
-  { key: 'table',   label: 'セット結果表',     min: 20, max: 200, defaultSize: 56 }
+  { key: 'name',    label: 'チーム名',     min: 20, max: 200, defaultSize: 76 },
+  { key: 'setsWon', label: '獲得セット数', min: 40, max: 700, defaultSize: 500 },
+  { key: 'table',   label: 'セット結果表', min: 20, max: 300, defaultSize: 124 }
 ];
 
 const Stepper = {

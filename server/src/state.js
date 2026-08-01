@@ -9,15 +9,11 @@ const FONT_DIR = join(__dirname, '..', 'public', 'fonts');
 
 const FONT_EXT = ['.woff2', '.woff', '.otf', '.ttf'];
 
-// 表示パターン(設定グループ)の定義。1つの設定グループを複数の出力ページで
-// 共有できる(OUTPUTS 側の styleOf で指定)。config.html のサイドバーは
-// この配列の順で並ぶ
 export const DISPLAYS = [
   { id: 'full',   file: 'disp-full.html',   label: 'フルスクリーン', counterStyleOption: false },
   { id: 'result', file: 'disp-result.html', label: '試合結果',       counterStyleOption: false }
 ];
 
-// 実際に開けるページの一覧。入口(index.html)はここから作られる
 export const OUTPUTS = [
   { file: 'disp-full.html',      label: 'フルスクリーン',           styleOf: 'full' },
   { file: 'disp-full-flip.html', label: 'フルスクリーン(左右反転)', styleOf: 'full' },
@@ -31,15 +27,15 @@ const RULES = {
   timeoutsPerSet: 2,
   subsPerSet: 6,
   challengesPerSet: 2,
+  // 表示/非表示・加算(使用回数)か減算(残り回数)かの初期値。
+  // タイムアウトと選手交代は加算(used)、チャレンジは減算(remaining)で開始する
   counterDisplay: {
-    timeouts:   { visible: true, mode: 'remaining' },
-    subs:       { visible: true, mode: 'remaining' },
+    timeouts:   { visible: true, mode: 'used' },
+    subs:       { visible: true, mode: 'used' },
     challenges: { visible: true, mode: 'remaining' }
   }
 };
 
-// 表示パターンごとに持つブロックの形が違う(フルスクリーンは4項目、
-// 試合結果は3項目)。id ごとのひな形をここにまとめて持たせる
 const BLOCK_PRESETS = {
   full: {
     name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
@@ -48,9 +44,9 @@ const BLOCK_PRESETS = {
     counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
   },
   result: {
-    name:    { x: 0, y: 0, size: 64,  font: 'system', color: '#000000' },
-    setsWon: { x: 0, y: 0, size: 160, font: 'system', color: '#000000' },
-    table:   { x: 0, y: 0, size: 56,  font: 'system', color: '#000000' }
+    name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
+    setsWon: { x: 0, y: 0, size: 500, font: 'system', color: '#000000' },
+    table:   { x: 0, y: 0, size: 124, font: 'system', color: '#000000' }
   }
 };
 
@@ -59,8 +55,6 @@ export function createDisplay(id) {
   return { blocks: JSON.parse(JSON.stringify(preset)) };
 }
 
-// shortName: チーム名の短縮版。空文字が既定で、未設定なら通常の name を使う
-// (どちらを使うかは表示ページ側の判断)
 function createTeam(name) {
   return { name, shortName: '', score: 0, setsWon: 0, timeouts: 0, subs: 0, challenges: 0 };
 }

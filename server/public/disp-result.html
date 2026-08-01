@@ -17,15 +17,14 @@
   }
   #stage.ready { opacity: 1; }
   .abs { position: absolute; display: flex; }
-  .name { width: 740px; height: 180px; align-items: center; justify-content: center;
+  .name { width: 792px; height: 165px; align-items: center; justify-content: center;
           font-weight: 700; line-height: 1.15; text-align: center;
-          overflow: hidden; word-break: break-word; }
-  .setsnum { width: 280px; height: 240px; align-items: center; justify-content: center;
+          overflow: hidden; word-break: break-word; white-space: pre-line; }
+  .setsnum { width: 330px; height: 450px; align-items: center; justify-content: center;
              font-weight: 800; line-height: 1; }
-  .setsdash { width: 80px; height: 16px; }
-  .rownum { width: 220px; height: 64px; align-items: center; justify-content: center;
+  .rownum { width: 138px; height: 90px; align-items: center; justify-content: center;
             font-weight: 700; line-height: 1; }
-  .rowdash { width: 60px; height: 10px; }
+  .rowdash { width: 47px; height: 10px; }
 </style>
 </head>
 <body>
@@ -34,17 +33,19 @@
   <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
     <template v-if="state">
 
-      <div class="abs name" :style="spreadPos(100, 'left', 70, 'name')">{{ displayName('home') }}</div>
-      <div class="abs name" :style="spreadPos(1080, 'right', 70, 'name')">{{ displayName('away') }}</div>
+      <!-- チーム名(短縮ではなく通常の名前) -->
+      <div class="abs name" :style="spreadPos(89, 'left', 39, 'name')">{{ state.home.name }}</div>
+      <div class="abs name" :style="spreadPos(1033, 'right', 39, 'name')">{{ state.away.name }}</div>
 
-      <div class="abs setsnum" :style="spreadPos(640, 'left', 340, 'setsWon')">{{ state.home.setsWon }}</div>
-      <div class="abs setsdash" :style="fixedPos(920, 452, blocks.setsWon.color)"></div>
-      <div class="abs setsnum" :style="spreadPos(1000, 'right', 340, 'setsWon')">{{ state.away.setsWon }}</div>
+      <!-- 獲得セット数。左右の外側に配置。初期値は 0(state.home/away.setsWon をそのまま表示) -->
+      <div class="abs setsnum" :style="spreadPos(300, 'left', 338, 'setsWon')">{{ state.home.setsWon }}</div>
+      <div class="abs setsnum" :style="spreadPos(1250, 'right', 338, 'setsWon')">{{ state.away.setsWon }}</div>
 
+      <!-- セット結果。行数に応じてブロック全体を中央(RESULTS_CENTER_Y)に揃える -->
       <template v-for="(r, i) in results" :key="i">
-        <div class="abs rownum" :style="spreadPos(710, 'left', 640 + i * 84, 'table')">{{ r.home }}</div>
-        <div class="abs rowdash" :style="fixedPos(930, 640 + i * 84 + 27, blocks.table.color)"></div>
-        <div class="abs rownum" :style="spreadPos(990, 'right', 640 + i * 84, 'table')">{{ r.away }}</div>
+        <div class="abs rownum" :style="spreadPos(771, 'left', rowTop(i), 'table')">{{ r.home }}</div>
+        <div class="abs rowdash" :style="fixedPos(933, rowTop(i) + 40, blocks.table.color)"></div>
+        <div class="abs rownum" :style="spreadPos(1000, 'right', rowTop(i), 'table')">{{ r.away }}</div>
       </template>
 
     </template>
@@ -57,6 +58,12 @@ const { createApp, ref, computed, onMounted } = Vue;
 const DISPLAY_ID = 'result';
 const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
 const BLOCK_KEYS = ['name', 'setsWon', 'table'];
+
+// セット結果の行の並び。PDFの実測値(行高90・行間109)をそのまま使う
+const ROW_HEIGHT = 90;
+const ROW_PITCH = 109;
+// 獲得セット数の縦の中心と揃えることで、1つの帯として見えるようにしている
+const RESULTS_CENTER_Y = 562;
 
 createApp({
   setup() {
@@ -87,9 +94,22 @@ createApp({
       };
     }
 
-    // ハイフン専用。位置は固定、色だけ隣接するブロックに合わせる
+    // ハイフン専用。位置は行位置に連動するが、縦位置の調整(y)の影響は受けない
+    // (数字だけを動かし、ハイフンはその場に残す既存の仕様に合わせている)
     function fixedPos(left, top, color) {
       return { left: left + 'px', top: top + 'px', background: color };
+    }
+
+    // 確定済みのセットをすべて表示する(件数の上限なし、試合の途中でも自然に使える)
+    const results = computed(() => state.value ? state.value.setResults : []);
+
+    // n行ぶんのブロック高さを計算し、常に RESULTS_CENTER_Y を中心に配置する。
+    // セット数が増減しても、ブロックはその時々の行数に応じて中央に寄る
+    function rowTop(i) {
+      const n = results.value.length;
+      const blockHeight = (n - 1) * ROW_PITCH + ROW_HEIGHT;
+      const blockTop = RESULTS_CENTER_Y - blockHeight / 2;
+      return blockTop + i * ROW_PITCH;
     }
 
     let lastSignature = '';
@@ -124,21 +144,13 @@ createApp({
       el.textContent = rules.join('\n');
     }
 
-    // 短縮名が未設定ならチーム名にフォールバック(この画面だけの挙動)
-    function displayName(team) {
-      const s = state.value;
-      if (!s) return '';
-      return s[team].shortName || s[team].name;
-    }
-
-    // 確定済みのセットをすべて表示する(件数の上限なし)
-    const results = computed(() => state.value ? state.value.setResults : []);
-
     function fit() {
       scale.value = Math.min(window.innerWidth / 1920, window.innerHeight / 1080, 1);
     }
 
     const socket = io();
+    // サーバーから 'state' が届くたびに反映する。得点・セット結果の変更は
+    // すべてこの1本の経路で流れてくるので、特別な仕組みなしに即座に反映される
     socket.on('state', (s) => {
       state.value = s;
       syncFontFaces();
@@ -148,7 +160,7 @@ createApp({
 
     onMounted(() => { fit(); window.addEventListener('resize', fit); });
 
-    return { state, blocks, visible, scale, results, spreadPos, fixedPos, displayName };
+    return { state, blocks, visible, scale, results, rowTop, spreadPos, fixedPos };
   }
 }).mount('#app');
 </script>
