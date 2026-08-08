@@ -38,11 +38,15 @@
   .block-font-col { flex: 1 1 220px; min-width: 200px; }
   .block-pos-col { flex: 0 0 auto; }
 
-  .block-grid-3 {
+  /* 2つずつ・3つずつ、どちらのグループでも使う共通の並びグリッド。
+     画面が狭いときは自然に1列へ折り返す */
+  .block-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
     gap: 1rem;
+    margin-bottom: 1rem;
   }
+  .block-row:last-child { margin-bottom: 0; }
 
   .danger { background: var(--danger); border-color: #991b1b; padding: 0.9rem 1.5rem; font-size: 1rem; }
 
@@ -135,6 +139,9 @@
   .color-row.r input[type=range] { accent-color: #ff6b6b; }
   .color-row.g input[type=range] { accent-color: #51cf66; }
   .color-row.b input[type=range] { accent-color: #4dabf7; }
+
+  .anim-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.7rem; }
+  .anim-row label { font-size: 0.82rem; color: var(--dim); }
 </style>
 </head>
 <body>
@@ -240,15 +247,26 @@
           <template v-if="currentDef.id === 'full'">
             <p class="hint">
               位置は矢印ボタンで動かします。「チーム名」「得点」「セット結果」は
-              中央から寄せる/広げる形、「タイムアウト、選手交代、チャレンジ」は
-              そのまま左右/上下に動きます。
+              中央から寄せる/広げる形、「サーブ権表示」はサイズを変えても常に得点欄の中心を保ちます。
+              「タイムアウト、選手交代、チャレンジ」はそのまま左右/上下に動きます。
             </p>
-            <div class="block-grid-3">
-              <block-editor v-for="b in threePaneDefs" :key="b.key"
+
+            <div class="block-row">
+              <block-editor v-for="b in rowNameScore" :key="b.key"
                             :label="b.label" :block="display.blocks[b.key]" :fonts="fonts"
+                            :size-min="b.min" :size-max="b.max" :default-size="b.defaultSize"
+                            :show-animate="!!b.animateToggle"
+                            @change="setBlock(b.key, $event)"></block-editor>
+            </div>
+
+            <div class="block-row">
+              <block-editor v-for="b in rowResultServe" :key="b.key"
+                            :label="b.label" :block="display.blocks[b.key]" :fonts="fonts"
+                            :hide-font="!!b.hideFont"
                             :size-min="b.min" :size-max="b.max" :default-size="b.defaultSize"
                             @change="setBlock(b.key, $event)"></block-editor>
             </div>
+
             <block-editor v-if="counterDef" :label="counterDef.label"
                           :block="display.blocks[counterDef.key]" :fonts="fonts"
                           :size-min="counterDef.min" :size-max="counterDef.max"
@@ -263,7 +281,7 @@
               すべて中央から寄せる/広げる形で動きます。この画面は disp-full.html /
               disp-full-flip.html とは独立した設定です(互いに影響しません)。
             </p>
-            <div class="block-grid-3">
+            <div class="block-row">
               <block-editor v-for="b in resultBlockDefs" :key="b.key"
                             :label="b.label" :block="display.blocks[b.key]" :fonts="fonts"
                             :size-min="b.min" :size-max="b.max" :default-size="b.defaultSize"
@@ -285,15 +303,16 @@ const COUNTER_DEFS = [
   { kind: 'challenges', label: 'チャレンジ',   max: 'challengesPerSet', cap: 9 }
 ];
 
-// defaultSize は state.js の BLOCK_PRESETS.full の初期値と一致させている
+// animateToggle: true の項目にだけ「得点時のアニメーション」トグルが表示される
+// hideFont: true の項目はフォント選択欄を出さない(文字ではないブロック用)
 const FULL_BLOCK_DEFS = [
   { key: 'name',    label: 'チーム名',                         min: 20, max: 200, defaultSize: 76 },
-  { key: 'score',   label: '得点',                             min: 60, max: 700, defaultSize: 410 },
+  { key: 'score',   label: '得点',                             min: 60, max: 700, defaultSize: 410, animateToggle: true },
   { key: 'result',  label: 'セット結果',                       min: 20, max: 300, defaultSize: 124 },
+  { key: 'serve',   label: 'サーブ権表示',                     min: 10, max: 200, defaultSize: 40,  hideFont: true },
   { key: 'counter', label: 'タイムアウト、選手交代、チャレンジ', min: 20, max: 300, defaultSize: 124 }
 ];
 
-// defaultSize は state.js の BLOCK_PRESETS.result の初期値と一致させている
 const RESULT_BLOCK_DEFS = [
   { key: 'name',    label: 'チーム名',     min: 20, max: 200, defaultSize: 76 },
   { key: 'setsWon', label: '獲得セット数', min: 40, max: 700, defaultSize: 500 },
@@ -403,7 +422,9 @@ const BlockEditor = {
     sizeMin:     { type: Number, default: 20 },
     sizeMax:     { type: Number, default: 300 },
     defaultSize: { type: Number, required: true },
-    showStyle:   { type: Boolean, default: false }
+    showStyle:   { type: Boolean, default: false },
+    showAnimate: { type: Boolean, default: false },
+    hideFont:    { type: Boolean, default: false }
   },
   emits: ['change'],
   computed: {
@@ -421,7 +442,7 @@ const BlockEditor = {
       <h3>{{ label }}</h3>
       <div class="block-body">
         <div class="block-font-col">
-          <div class="row">
+          <div class="row" v-if="!hideFont">
             <label>フォント</label>
             <select :value="block.font" @change="$emit('change', { font: $event.target.value })">
               <option value="system">システム標準</option>
@@ -463,6 +484,13 @@ const BlockEditor = {
               <span class="color-val">{{ rgb.b }}</span>
             </div>
           </div>
+
+          <div class="anim-row" v-if="showAnimate">
+            <label>得点時のアニメーション</label>
+            <toggle-switch :value="block.animate !== false" on-text="ON" off-text="OFF"
+                           on-color="var(--ok)" off-color="#4b4f58"
+                           @change="$emit('change', { animate: $event })"></toggle-switch>
+          </div>
         </div>
 
         <div class="block-pos-col">
@@ -494,7 +522,10 @@ createApp({
     const display = computed(() =>
       state.value && currentDef.value ? state.value.displays[tab.value] : null);
 
-    const threePaneDefs = computed(() => FULL_BLOCK_DEFS.filter((b) => b.key !== 'counter'));
+    // 「チーム名」「得点」が1行、「セット結果」「サーブ権表示」が1行、
+    // 「タイムアウト等」が単独の1行、という固定の並びにする
+    const rowNameScore = computed(() => FULL_BLOCK_DEFS.filter((b) => ['name', 'score'].includes(b.key)));
+    const rowResultServe = computed(() => FULL_BLOCK_DEFS.filter((b) => ['result', 'serve'].includes(b.key)));
     const counterDef = computed(() => FULL_BLOCK_DEFS.find((b) => b.key === 'counter'));
     const resultBlockDefs = RESULT_BLOCK_DEFS;
 
@@ -525,7 +556,7 @@ createApp({
     }
 
     return { state, connected, fonts, tab, currentDef, display,
-             counterDefs: COUNTER_DEFS, threePaneDefs, counterDef, resultBlockDefs,
+             counterDefs: COUNTER_DEFS, rowNameScore, rowResultServe, counterDef, resultBlockDefs,
              setRule, isMaxed, setVisible, setMode, setDisplay, setBlock, resetMatch };
   }
 })

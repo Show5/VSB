@@ -51,6 +51,11 @@
   .pip.used { background: var(--warn); }
   .counter.is-maxed .pip.used { background: var(--away); }
   .counter button { width: 38px; height: 34px; font-size: 1.1rem; }
+  .counter-val {
+    min-width: 1.7rem; text-align: center; font-size: 1.05rem; font-weight: 600;
+    font-variant-numeric: tabular-nums; flex-shrink: 0; transition: color 0.15s ease;
+  }
+  .counter-val.maxed { color: var(--away); }
 
   .middle { background: var(--panel); border-radius: 10px; padding: 1rem; }
   .end-set { width: 100%; padding: 1.1rem 0.5rem; font-size: 1.05rem; }
@@ -116,12 +121,13 @@
           <label :class="{ maxed: isMaxed('home', c) }">{{ c.label }}</label>
           <div class="pips">
             <div v-for="n in state.rules[c.max]" :key="n"
-                 class="pip" :class="{ used: n <= state.home[c.kind] }"></div>
+                 class="pip" :class="{ used: pipLit('home', c, n) }"></div>
           </div>
-          <button :disabled="state.home[c.kind] <= 0"
-                  @click="send('counter:undo', { team: 'home', kind: c.kind })">−</button>
-          <button :disabled="state.home[c.kind] >= state.rules[c.max]"
-                  @click="send('counter:use', { team: 'home', kind: c.kind })">+</button>
+          <button :disabled="counterAtMin('home', c)"
+                  @click="counterMinus('home', c)">−</button>
+          <span class="counter-val" :class="{ maxed: isMaxed('home', c) }">{{ counterValue('home', c) }}</span>
+          <button :disabled="counterAtMax('home', c)"
+                  @click="counterPlus('home', c)">+</button>
         </div>
       </div>
 
@@ -170,12 +176,13 @@
           <label :class="{ maxed: isMaxed('away', c) }">{{ c.label }}</label>
           <div class="pips">
             <div v-for="n in state.rules[c.max]" :key="n"
-                 class="pip" :class="{ used: n <= state.away[c.kind] }"></div>
+                 class="pip" :class="{ used: pipLit('away', c, n) }"></div>
           </div>
-          <button :disabled="state.away[c.kind] <= 0"
-                  @click="send('counter:undo', { team: 'away', kind: c.kind })">−</button>
-          <button :disabled="state.away[c.kind] >= state.rules[c.max]"
-                  @click="send('counter:use', { team: 'away', kind: c.kind })">+</button>
+          <button :disabled="counterAtMin('away', c)"
+                  @click="counterMinus('away', c)">−</button>
+          <span class="counter-val" :class="{ maxed: isMaxed('away', c) }">{{ counterValue('away', c) }}</span>
+          <button :disabled="counterAtMax('away', c)"
+                  @click="counterPlus('away', c)">+</button>
         </div>
       </div>
 
@@ -234,10 +241,50 @@ createApp({
       return top >= target.value && lead >= 2;
     });
 
+    // 実際の使用回数が上限に達しているか。赤い強調表示の判定に使う。
+    // 表示モードに関わらず「本当に使い切ったかどうか」を示すので、ここは変えない
     function isMaxed(team, c) {
       const s = state.value;
       if (!s) return false;
       return s[team][c.kind] >= s.rules[c.max];
+    }
+
+    // 画面に見えている数値。config.html の加算/減算設定で計算式が変わる
+    function counterValue(team, c) {
+      const s = state.value;
+      const used = s[team][c.kind];
+      const max = s.rules[c.max];
+      const mode = s.rules.counterDisplay[c.kind].mode;
+      return mode === 'used' ? used : max - used;
+    }
+
+    // 丸印は常に「見えている数値」の分だけ点灯させる
+    function pipLit(team, c, n) {
+      return n <= counterValue(team, c);
+    }
+
+    // 「+」ボタン: 見えている数値を+1する。
+    // 加算モードなら実際の使用回数を+1、減算モードなら-1(残りが+1になる)
+    function counterPlus(team, c) {
+      const mode = state.value.rules.counterDisplay[c.kind].mode;
+      send(mode === 'used' ? 'counter:use' : 'counter:undo', { team, kind: c.kind });
+    }
+
+    // 「−」ボタン: 見えている数値を-1する
+    function counterMinus(team, c) {
+      const mode = state.value.rules.counterDisplay[c.kind].mode;
+      send(mode === 'used' ? 'counter:undo' : 'counter:use', { team, kind: c.kind });
+    }
+
+    // 見えている数値がすでに上限か(「+」ボタンを押せなくする条件)
+    function counterAtMax(team, c) {
+      const s = state.value;
+      return counterValue(team, c) >= s.rules[c.max];
+    }
+
+    // 見えている数値がすでに0か(「−」ボタンを押せなくする条件)
+    function counterAtMin(team, c) {
+      return counterValue(team, c) <= 0;
     }
 
     function canAdd(team) {
@@ -269,7 +316,8 @@ createApp({
     onUnmounted(() => document.removeEventListener('keydown', onKey));
 
     return { state, connected, counterDefs: COUNTER_DEFS, target, setReady,
-             isMaxed, canAdd, send, endSet, growAll };
+             isMaxed, counterValue, pipLit, counterPlus, counterMinus, counterAtMax, counterAtMin,
+             canAdd, send, endSet, growAll };
   }
 }).mount('#app');
 </script>

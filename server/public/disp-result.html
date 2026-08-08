@@ -33,15 +33,13 @@
   <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
     <template v-if="state">
 
-      <!-- チーム名(短縮ではなく通常の名前) -->
       <div class="abs name" :style="spreadPos(89, 'left', 39, 'name')">{{ state.home.name }}</div>
       <div class="abs name" :style="spreadPos(1033, 'right', 39, 'name')">{{ state.away.name }}</div>
 
-      <!-- 獲得セット数。左右の外側に配置。初期値は 0(state.home/away.setsWon をそのまま表示) -->
       <div class="abs setsnum" :style="spreadPos(300, 'left', 338, 'setsWon')">{{ state.home.setsWon }}</div>
       <div class="abs setsnum" :style="spreadPos(1250, 'right', 338, 'setsWon')">{{ state.away.setsWon }}</div>
 
-      <!-- セット結果。行数に応じてブロック全体を中央(RESULTS_CENTER_Y)に揃える -->
+      <!-- 確定済みのセットのみ表示する(進行中のセットは含めない) -->
       <template v-for="(r, i) in results" :key="i">
         <div class="abs rownum" :style="spreadPos(771, 'left', rowTop(i), 'table')">{{ r.home }}</div>
         <div class="abs rowdash" :style="fixedPos(933, rowTop(i) + 40, blocks.table.color)"></div>
@@ -59,10 +57,8 @@ const DISPLAY_ID = 'result';
 const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
 const BLOCK_KEYS = ['name', 'setsWon', 'table'];
 
-// セット結果の行の並び。PDFの実測値(行高90・行間109)をそのまま使う
 const ROW_HEIGHT = 90;
 const ROW_PITCH = 109;
-// 獲得セット数の縦の中心と揃えることで、1つの帯として見えるようにしている
 const RESULTS_CENTER_Y = 562;
 
 createApp({
@@ -81,7 +77,6 @@ createApp({
       return `"disp-font-${key}", ${SYSTEM_STACK}`;
     }
 
-    // slot: 'left'(HOME側) / 'right'(AWAY側)。x は中央からの距離として扱う
     function spreadPos(baseLeft, slot, baseTop, key) {
       const b = blocks.value[key];
       const dx = slot === 'left' ? -b.x : b.x;
@@ -94,17 +89,13 @@ createApp({
       };
     }
 
-    // ハイフン専用。位置は行位置に連動するが、縦位置の調整(y)の影響は受けない
-    // (数字だけを動かし、ハイフンはその場に残す既存の仕様に合わせている)
     function fixedPos(left, top, color) {
       return { left: left + 'px', top: top + 'px', background: color };
     }
 
-    // 確定済みのセットをすべて表示する(件数の上限なし、試合の途中でも自然に使える)
+    // 確定済みのセットをすべて表示する(件数の上限なし)
     const results = computed(() => state.value ? state.value.setResults : []);
 
-    // n行ぶんのブロック高さを計算し、常に RESULTS_CENTER_Y を中心に配置する。
-    // セット数が増減しても、ブロックはその時々の行数に応じて中央に寄る
     function rowTop(i) {
       const n = results.value.length;
       const blockHeight = (n - 1) * ROW_PITCH + ROW_HEIGHT;
@@ -149,8 +140,6 @@ createApp({
     }
 
     const socket = io();
-    // サーバーから 'state' が届くたびに反映する。得点・セット結果の変更は
-    // すべてこの1本の経路で流れてくるので、特別な仕組みなしに即座に反映される
     socket.on('state', (s) => {
       state.value = s;
       syncFontFaces();

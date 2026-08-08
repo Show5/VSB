@@ -28,6 +28,20 @@
   .result-dash { width: 38px; height: 9px; }
   .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
              font-weight: 700; line-height: 1; }
+  .serve-dot { border-radius: 50%; }
+
+  .score.flip-anim {
+    animation: score-flip 0.55s ease-in-out;
+  }
+  @keyframes score-flip {
+    0%   { transform: perspective(500px) translateY(0)              rotateY(0deg); }
+    25%  { transform: perspective(500px) translateY(var(--flip-lift)) rotateY(0deg); }
+    75%  { transform: perspective(500px) translateY(var(--flip-lift)) rotateY(360deg); }
+    100% { transform: perspective(500px) translateY(0)              rotateY(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .score.flip-anim { animation: none; }
+  }
 </style>
 </head>
 <body>
@@ -40,9 +54,14 @@
       <div class="abs name" :style="spreadPos(140, 'left', 39, 'name')">{{ state[LEFT].name }}</div>
       <div class="abs name" :style="spreadPos(980, 'right', 39, 'name')">{{ state[RIGHT].name }}</div>
 
-      <div class="abs score" :style="spreadPos(327, 'left', 180, 'score')">{{ state[LEFT].score }}</div>
+      <div class="abs score" ref="leftScoreEl"
+           :style="{ ...spreadPos(327, 'left', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state[LEFT].score }}</div>
       <div class="abs dash"  :style="fixedPos(896, 404, blocks.score.color)"></div>
-      <div class="abs score" :style="spreadPos(1167, 'right', 180, 'score')">{{ state[RIGHT].score }}</div>
+      <div class="abs score" ref="rightScoreEl"
+           :style="{ ...spreadPos(1167, 'right', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state[RIGHT].score }}</div>
+
+      <div v-if="state.servingTeam === LEFT"  class="abs serve-dot" :style="servePos(LEFT)"></div>
+      <div v-if="state.servingTeam === RIGHT" class="abs serve-dot" :style="servePos(RIGHT)"></div>
 
       <div v-for="c in counters" :key="c.key" class="abs counter"
            :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
@@ -65,7 +84,6 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 
-// disp-full.html と同じ調整データ(state.displays.full)を共有する
 const DISPLAY_ID = 'full';
 const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
 
@@ -81,11 +99,36 @@ const COL_X = { [LEFT]: 50, [RIGHT]: 1687 };
 const MAX_COLOR = '#ef4444';
 const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
+// 通常版と同じ基準点。servingTeam(home/away)を LEFT/RIGHT どちらのスロットかに変換して使う
+const SERVE_CX = { [LEFT]: 541.5, [RIGHT]: 1381.5 };
+
+const SCORE_DEFAULT_SIZE = 410;
+const FLIP_LIFT = -(SCORE_DEFAULT_SIZE * 0.15);
+
 createApp({
   setup() {
     const state = ref(null);
     const connected = ref(false);
     const scale = ref(1);
+    const leftScoreEl = ref(null);
+    const rightScoreEl = ref(null);
+
+    let prevLeftScore = null;
+    let prevRightScore = null;
+
+    function playFlip(el) {
+      if (!el || !blocks.value || !blocks.value.score.animate) return;
+      el.classList.remove('flip-anim');
+      void el.offsetWidth;
+      el.classList.add('flip-anim');
+    }
+
+    function detectScoreFlip(s) {
+      if (prevLeftScore !== null && s[LEFT].score > prevLeftScore) playFlip(leftScoreEl.value);
+      if (prevRightScore !== null && s[RIGHT].score > prevRightScore) playFlip(rightScoreEl.value);
+      prevLeftScore = s[LEFT].score;
+      prevRightScore = s[RIGHT].score;
+    }
 
     const conf = computed(() => state.value ? state.value.displays[DISPLAY_ID] : null);
     const blocks = computed(() => conf.value ? conf.value.blocks : null);
@@ -103,8 +146,7 @@ createApp({
         left: (left + b.x) + 'px',
         top: (top + b.y) + 'px',
         fontSize: b.size + 'px',
-        fontFamily: fontFamilyFor(key),
-        color: b.color
+        fontFamily: fontFamilyFor(key)
       };
     }
 
@@ -122,6 +164,20 @@ createApp({
 
     function fixedPos(left, top, color) {
       return { left: left + 'px', top: top + 'px', background: color };
+    }
+
+    function servePos(team) {
+      const b = blocks.value.serve;
+      const slot = team === LEFT ? 'left' : 'right';
+      const dx = slot === 'left' ? -b.x : b.x;
+      const cx = SERVE_CX[team] + dx;
+      return {
+        left: (cx - b.size / 2) + 'px',
+        top: (605 + b.y) + 'px',
+        width: b.size + 'px',
+        height: b.size + 'px',
+        background: b.color
+      };
     }
 
     let lastSignature = '';
@@ -187,6 +243,7 @@ createApp({
 
     const socket = io();
     socket.on('state', (s) => {
+      detectScoreFlip(s);
       state.value = s;
       syncFontFaces();
     });
@@ -195,7 +252,10 @@ createApp({
 
     onMounted(() => { fit(); window.addEventListener('resize', fit); });
 
-    return { state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, LEFT, RIGHT, MAX_COLOR };
+    return {
+      state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, servePos, LEFT, RIGHT, MAX_COLOR,
+      leftScoreEl, rightScoreEl, flipLift: FLIP_LIFT
+    };
   }
 }).mount('#app');
 </script>

@@ -27,8 +27,6 @@ const RULES = {
   timeoutsPerSet: 2,
   subsPerSet: 6,
   challengesPerSet: 2,
-  // 表示/非表示・加算(使用回数)か減算(残り回数)かの初期値。
-  // タイムアウトと選手交代は加算(used)、チャレンジは減算(remaining)で開始する
   counterDisplay: {
     timeouts:   { visible: true, mode: 'used' },
     subs:       { visible: true, mode: 'used' },
@@ -36,11 +34,14 @@ const RULES = {
   }
 };
 
+// serve は文字ではなく色付きの丸なので font を持たない。
+// size は丸の直径、color は塗りつぶし色(既定は赤)
 const BLOCK_PRESETS = {
   full: {
     name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
-    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000' },
+    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
     result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
+    serve:   { x: 0, y: 0, size: 40,  color: '#ff0000' },
     counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
   },
   result: {
