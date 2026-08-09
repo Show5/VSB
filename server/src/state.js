@@ -41,7 +41,7 @@ const BLOCK_PRESETS = {
     name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
     score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
     result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
-    serve:   { x: 0, y: 0, size: 40,  color: '#ff0000' },
+    serve:   { x: 0, y: 0, size: 150, color: '#ff0000' },
     counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
   },
   result: {

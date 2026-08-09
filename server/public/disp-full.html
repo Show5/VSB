@@ -28,7 +28,7 @@
   .result-dash { width: 38px; height: 9px; }
   .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
              font-weight: 700; line-height: 1; }
-  .serve-dot { border-radius: 50%; }
+  .serve-bar { }
 
   .score.flip-anim {
     animation: score-flip 0.55s ease-in-out;
@@ -59,9 +59,9 @@
       <div class="abs score" ref="awayScoreEl"
            :style="{ ...spreadPos(1167, 'right', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state.away.score }}</div>
 
-      <!-- サーブ権表示。サーブ権を持つ側だけに丸が現れる -->
-      <div v-if="state.servingTeam === 'home'" class="abs serve-dot" :style="servePos('home')"></div>
-      <div v-if="state.servingTeam === 'away'" class="abs serve-dot" :style="servePos('away')"></div>
+      <!-- サーブ権表示。得点の下にアンダースコア状のバーで表示する -->
+      <div v-if="state.servingTeam === 'home'" class="abs serve-bar" :style="servePos('home')"></div>
+      <div v-if="state.servingTeam === 'away'" class="abs serve-bar" :style="servePos('away')"></div>
 
       <div v-for="c in counters" :key="c.key" class="abs counter"
            :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
@@ -93,11 +93,12 @@ const COUNTERS = [
 ];
 const COL_X = { home: 50, away: 1687 };
 const MAX_COLOR = '#ef4444';
-// フォントを持つブロックだけを対象にする(serve は文字ではないので含めない)
 const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
-// 得点欄(幅429)の水平中心。サーブ権の丸をここに揃える基準点
+// 得点欄(幅429)の水平中心。サーブ権バーをここに揃える基準点
 const SERVE_CX = { home: 541.5, away: 1381.5 };
+// バーの太さは幅(size)の13%を目安にする(アンダースコアらしい細さにするため)
+const SERVE_HEIGHT_RATIO = 0.13;
 
 const SCORE_DEFAULT_SIZE = 410;
 const FLIP_LIFT = -(SCORE_DEFAULT_SIZE * 0.15);
@@ -163,18 +164,19 @@ createApp({
       return { left: left + 'px', top: top + 'px', background: color };
     }
 
-    // サーブ権の丸。サイズが変わっても常に得点欄の中心に来るよう、
-    // 中心座標から半径ぶん引いて left を決める
+    // サーブ権バー。幅(size)を変えても常に得点欄の中心に来るよう、
+    // 中心座標から幅の半分を引いて left を決める。太さは幅から自動計算する
     function servePos(team) {
       const b = blocks.value.serve;
       const slot = team === 'home' ? 'left' : 'right';
       const dx = slot === 'left' ? -b.x : b.x;
       const cx = SERVE_CX[team] + dx;
+      const height = Math.max(3, b.size * SERVE_HEIGHT_RATIO);
       return {
         left: (cx - b.size / 2) + 'px',
         top: (605 + b.y) + 'px',
         width: b.size + 'px',
-        height: b.size + 'px',
+        height: height + 'px',
         background: b.color
       };
     }

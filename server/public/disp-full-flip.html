@@ -28,7 +28,7 @@
   .result-dash { width: 38px; height: 9px; }
   .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
              font-weight: 700; line-height: 1; }
-  .serve-dot { border-radius: 50%; }
+  .serve-bar { }
 
   .score.flip-anim {
     animation: score-flip 0.55s ease-in-out;
@@ -60,8 +60,8 @@
       <div class="abs score" ref="rightScoreEl"
            :style="{ ...spreadPos(1167, 'right', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state[RIGHT].score }}</div>
 
-      <div v-if="state.servingTeam === LEFT"  class="abs serve-dot" :style="servePos(LEFT)"></div>
-      <div v-if="state.servingTeam === RIGHT" class="abs serve-dot" :style="servePos(RIGHT)"></div>
+      <div v-if="state.servingTeam === LEFT"  class="abs serve-bar" :style="servePos(LEFT)"></div>
+      <div v-if="state.servingTeam === RIGHT" class="abs serve-bar" :style="servePos(RIGHT)"></div>
 
       <div v-for="c in counters" :key="c.key" class="abs counter"
            :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
@@ -99,8 +99,8 @@ const COL_X = { [LEFT]: 50, [RIGHT]: 1687 };
 const MAX_COLOR = '#ef4444';
 const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
-// 通常版と同じ基準点。servingTeam(home/away)を LEFT/RIGHT どちらのスロットかに変換して使う
 const SERVE_CX = { [LEFT]: 541.5, [RIGHT]: 1381.5 };
+const SERVE_HEIGHT_RATIO = 0.13;
 
 const SCORE_DEFAULT_SIZE = 410;
 const FLIP_LIFT = -(SCORE_DEFAULT_SIZE * 0.15);
@@ -171,11 +171,12 @@ createApp({
       const slot = team === LEFT ? 'left' : 'right';
       const dx = slot === 'left' ? -b.x : b.x;
       const cx = SERVE_CX[team] + dx;
+      const height = Math.max(3, b.size * SERVE_HEIGHT_RATIO);
       return {
         left: (cx - b.size / 2) + 'px',
         top: (605 + b.y) + 'px',
         width: b.size + 'px',
-        height: b.size + 'px',
+        height: height + 'px',
         background: b.color
       };
     }
