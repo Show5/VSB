@@ -11,12 +11,14 @@ const FONT_EXT = ['.woff2', '.woff', '.otf', '.ttf'];
 
 export const DISPLAYS = [
   { id: 'full',   file: 'disp-full.html',   label: 'フルスクリーン', counterStyleOption: false },
+  { id: 'tgc',    file: 'disp-tgc.html',    label: '卒団式(TGC)',   counterStyleOption: false },
   { id: 'result', file: 'disp-result.html', label: '試合結果',       counterStyleOption: false }
 ];
 
 export const OUTPUTS = [
   { file: 'disp-full.html',      label: 'フルスクリーン',           styleOf: 'full' },
   { file: 'disp-full-flip.html', label: 'フルスクリーン(左右反転)', styleOf: 'full' },
+  { file: 'disp-tgc.html',       label: '卒団式(TGC)',              styleOf: 'tgc' },
   { file: 'disp-result.html',    label: '試合結果',                 styleOf: 'result' }
 ];
 
@@ -34,16 +36,19 @@ const RULES = {
   }
 };
 
-// serve は文字ではなく色付きの丸なので font を持たない。
-// size は丸の直径、color は塗りつぶし色(既定は赤)
+// tgc(卒団式用)は、今は full とまったく同じ形をそのまま複製している。
+// 独立した設定グループなので、後でレイアウトを変えても full 側には影響しない
+const FULL_SHAPE = {
+  name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
+  score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
+  result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
+  serve:   { width: 150, thickness: 20, gap: 10, color: '#ff0000' },
+  counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
+};
+
 const BLOCK_PRESETS = {
-  full: {
-    name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
-    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
-    result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
-    serve:   { x: 0, y: 0, size: 150, color: '#ff0000' },
-    counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
-  },
+  full: FULL_SHAPE,
+  tgc:  FULL_SHAPE,
   result: {
     name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
     setsWon: { x: 0, y: 0, size: 500, font: 'system', color: '#000000' },

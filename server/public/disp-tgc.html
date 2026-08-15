@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>表示：卒団式(TGC)</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/vue.global.js"></script>
+<style>
+  [v-cloak] { display: none; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%;
+               background: transparent; overflow: hidden; }
+  #stage {
+    position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+    transform-origin: top left;
+    font-variant-numeric: tabular-nums;
+    opacity: 0; transition: opacity 0.4s ease;
+  }
+  #stage.ready { opacity: 1; }
+  .abs { position: absolute; display: flex; }
+  .name { width: 792px; height: 165px; align-items: center; justify-content: center;
+          font-weight: 700; line-height: 1.15; text-align: center;
+          overflow: hidden; word-break: break-word; white-space: pre-line; }
+  .score { width: 429px; height: 420px; align-items: center; justify-content: center;
+           font-weight: 800; line-height: 1; }
+  .dash { width: 127px; height: 31px; }
+  .result-num { width: 138px; height: 90px; align-items: center; justify-content: center;
+                font-weight: 700; line-height: 1; }
+  .result-dash { width: 38px; height: 9px; }
+  .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
+             font-weight: 700; line-height: 1; }
+  .serve-bar { }
+
+  .score.flip-anim {
+    animation: score-flip 0.55s ease-in-out;
+  }
+  @keyframes score-flip {
+    0%   { transform: perspective(500px) translateY(0)              rotateY(0deg); }
+    25%  { transform: perspective(500px) translateY(var(--flip-lift)) rotateY(0deg); }
+    75%  { transform: perspective(500px) translateY(var(--flip-lift)) rotateY(360deg); }
+    100% { transform: perspective(500px) translateY(0)              rotateY(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .score.flip-anim { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app" v-cloak>
+  <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
+    <template v-if="state">
+
+      <div class="abs name" :style="spreadPos(140, 'left', 39, 'name')">{{ state.home.name }}</div>
+      <div class="abs name" :style="spreadPos(980, 'right', 39, 'name')">{{ state.away.name }}</div>
+
+      <div class="abs score" ref="homeScoreEl"
+           :style="{ ...spreadPos(327, 'left', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state.home.score }}</div>
+      <div class="abs dash"  :style="fixedPos(896, 404, blocks.score.color)"></div>
+      <div class="abs score" ref="awayScoreEl"
+           :style="{ ...spreadPos(1167, 'right', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state.away.score }}</div>
+
+      <!-- サーブ権表示。得点の下にアンダースコア状のバーで表示する -->
+      <div v-if="state.servingTeam === 'home'" class="abs serve-bar" :style="servePos('home')"></div>
+      <div v-if="state.servingTeam === 'away'" class="abs serve-bar" :style="servePos('away')"></div>
+
+      <div v-for="c in counters" :key="c.key" class="abs counter"
+           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
+        {{ c.value }}
+      </div>
+
+      <template v-for="(r, i) in results" :key="i">
+        <div class="abs result-num"
+             :style="spreadPos(798.5, 'left', 610 + i * 108, 'result')">{{ r.home }}</div>
+        <div class="abs result-dash"
+             :style="fixedPos(941, 610 + i * 108 + 40.5, blocks.result.color)"></div>
+        <div class="abs result-num"
+             :style="spreadPos(983.5, 'right', 610 + i * 108, 'result')">{{ r.away }}</div>
+      </template>
+
+    </template>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted } = Vue;
+
+const DISPLAY_ID = 'tgc';
+const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
+const COUNTERS = [
+  { kind: 'timeouts',   max: 'timeoutsPerSet',   top: 634 },
+  { kind: 'subs',       max: 'subsPerSet',       top: 774 },
+  { kind: 'challenges', max: 'challengesPerSet', top: 914 }
+];
+const COL_X = { home: 50, away: 1687 };
+const MAX_COLOR = '#ef4444';
+const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
+
+// 得点欄(幅429)の水平中心。サーブ権バーをここに揃える基準点
+const SERVE_CX = { home: 541.5, away: 1381.5 };
+// バーの太さは幅(size)の13%を目安にする(アンダースコアらしい細さにするため)
+const SERVE_HEIGHT_RATIO = 0.13;
+
+const SCORE_DEFAULT_SIZE = 410;
+const FLIP_LIFT = -(SCORE_DEFAULT_SIZE * 0.15);
+
+createApp({
+  setup() {
+    const state = ref(null);
+    const connected = ref(false);
+    const scale = ref(1);
+    const homeScoreEl = ref(null);
+    const awayScoreEl = ref(null);
+
+    let prevHomeScore = null;
+    let prevAwayScore = null;
+
+    function playFlip(el) {
+      if (!el || !blocks.value || !blocks.value.score.animate) return;
+      el.classList.remove('flip-anim');
+      void el.offsetWidth;
+      el.classList.add('flip-anim');
+    }
+
+    function detectScoreFlip(s) {
+      if (prevHomeScore !== null && s.home.score > prevHomeScore) playFlip(homeScoreEl.value);
+      if (prevAwayScore !== null && s.away.score > prevAwayScore) playFlip(awayScoreEl.value);
+      prevHomeScore = s.home.score;
+      prevAwayScore = s.away.score;
+    }
+
+    const conf = computed(() => state.value ? state.value.displays[DISPLAY_ID] : null);
+    const blocks = computed(() => conf.value ? conf.value.blocks : null);
+    const visible = computed(() => connected.value && state.value !== null);
+
+    function fontFamilyFor(key) {
+      const b = blocks.value[key];
+      if (!b || !b.font || b.font === 'system') return SYSTEM_STACK;
+      return `"disp-font-${key}", ${SYSTEM_STACK}`;
+    }
+
+    function pos(left, top, key) {
+      const b = blocks.value[key];
+      return {
+        left: (left + b.x) + 'px',
+        top: (top + b.y) + 'px',
+        fontSize: b.size + 'px',
+        fontFamily: fontFamilyFor(key)
+      };
+    }
+
+    function spreadPos(baseLeft, slot, baseTop, key) {
+      const b = blocks.value[key];
+      const dx = slot === 'left' ? -b.x : b.x;
+      return {
+        left: (baseLeft + dx) + 'px',
+        top: (baseTop + b.y) + 'px',
+        fontSize: b.size + 'px',
+        fontFamily: fontFamilyFor(key),
+        color: b.color
+      };
+    }
+
+    function fixedPos(left, top, color) {
+      return { left: left + 'px', top: top + 'px', background: color };
+    }
+
+    // サーブ権バー。幅(size)を変えても常に得点欄の中心に来るよう、
+    // 中心座標から幅の半分を引いて left を決める。太さは幅から自動計算する
+    function servePos(team) {
+      const b = blocks.value.serve;
+      const slot = team === 'home' ? 'left' : 'right';
+      const dx = slot === 'left' ? -b.x : b.x;
+      const cx = SERVE_CX[team] + dx;
+      const height = Math.max(3, b.size * SERVE_HEIGHT_RATIO);
+      return {
+        left: (cx - b.size / 2) + 'px',
+        top: (605 + b.y) + 'px',
+        width: b.size + 'px',
+        height: height + 'px',
+        background: b.color
+      };
+    }
+
+    let lastSignature = '';
+    function syncFontFaces() {
+      const b = blocks.value;
+      if (!b) return;
+
+      const rules = [];
+      const sigParts = [];
+      for (const key of BLOCK_KEYS) {
+        const font = b[key].font;
+        sigParts.push(`${key}:${font}`);
+        if (font && font !== 'system') {
+          const encodedPath = font.split('/').map(encodeURIComponent).join('/');
+          rules.push(
+            `@font-face { font-family: "disp-font-${key}"; font-display: block;` +
+            ` src: url("/fonts/${encodedPath}"); }`
+          );
+        }
+      }
+
+      const signature = sigParts.join('|');
+      if (signature === lastSignature) return;
+      lastSignature = signature;
+
+      let el = document.getElementById('font-faces');
+      if (!el) {
+        el = document.createElement('style');
+        el.id = 'font-faces';
+        document.head.appendChild(el);
+      }
+      el.textContent = rules.join('\n');
+    }
+
+    const results = computed(() =>
+      state.value ? state.value.setResults.slice(0, 4) : []);
+
+    const counters = computed(() => {
+      const s = state.value;
+      if (!s) return [];
+      const list = [];
+      for (const team of ['home', 'away']) {
+        for (const c of COUNTERS) {
+          const cd = s.rules.counterDisplay[c.kind];
+          if (!cd.visible) continue;
+          const used = s[team][c.kind];
+          const max = s.rules[c.max];
+          list.push({
+            key: team + c.kind,
+            left: COL_X[team],
+            top: c.top,
+            value: cd.mode === 'used' ? used : max - used,
+            maxed: used >= max
+          });
+        }
+      }
+      return list;
+    });
+
+    function fit() {
+      scale.value = Math.min(window.innerWidth / 1920, window.innerHeight / 1080, 1);
+    }
+
+    const socket = io();
+    socket.on('state', (s) => {
+      detectScoreFlip(s);
+      state.value = s;
+      syncFontFaces();
+    });
+    socket.on('connect', () => { connected.value = true; });
+    socket.on('disconnect', () => { connected.value = false; });
+
+    onMounted(() => { fit(); window.addEventListener('resize', fit); });
+
+    return {
+      state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, servePos, MAX_COLOR,
+      homeScoreEl, awayScoreEl, flipLift: FLIP_LIFT
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -244,7 +244,7 @@
         <div class="card card-full">
           <h2>ブロックごとの調整</h2>
 
-          <template v-if="currentDef.id === 'full'">
+          <template v-if="currentDef.id === 'full' || currentDef.id === 'tgc'">
             <p class="hint">
               位置は矢印ボタンで動かします。「チーム名」「得点」「セット結果」は
               中央から寄せる/広げる形、「サーブ権表示」はサイズを変えても常に得点欄の中心を保ちます。
