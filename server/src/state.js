@@ -36,19 +36,21 @@ const RULES = {
   }
 };
 
-// tgc(卒団式用)は、今は full とまったく同じ形をそのまま複製している。
-// 独立した設定グループなので、後でレイアウトを変えても full 側には影響しない
-const FULL_SHAPE = {
-  name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
-  score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
-  result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
-  serve:   { width: 150, thickness: 20, gap: 10, color: '#ff0000' },
-  counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
-};
-
 const BLOCK_PRESETS = {
-  full: FULL_SHAPE,
-  tgc:  FULL_SHAPE,
+  full: {
+    name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
+    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
+    result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
+    serve:   { width: 150, thickness: 20, gap: 10, color: '#ff0000' },
+    counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
+  },
+  // tgc(卒団式用)は下部バー専用の独自構成。名前やセット結果は持たない。
+  // score には区切り線の色(dashColor)も持たせる(得点の文字色とは別に調整できる)
+  tgc: {
+    score:   { x: 0, y: 0, size: 200, font: 'system', color: '#000000',
+               setsColor: '#00ff00', animate: true },
+    counter: { x: 0, y: 0, size: 60,  font: 'system', color: '#000000' }
+  },
   result: {
     name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
     setsWon: { x: 0, y: 0, size: 500, font: 'system', color: '#000000' },

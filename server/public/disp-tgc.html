@@ -17,30 +17,24 @@
   }
   #stage.ready { opacity: 1; }
   .abs { position: absolute; display: flex; }
-  .name { width: 792px; height: 165px; align-items: center; justify-content: center;
-          font-weight: 700; line-height: 1.15; text-align: center;
-          overflow: hidden; word-break: break-word; white-space: pre-line; }
-  .score { width: 429px; height: 420px; align-items: center; justify-content: center;
-           font-weight: 800; line-height: 1; }
-  .dash { width: 127px; height: 31px; }
-  .result-num { width: 138px; height: 90px; align-items: center; justify-content: center;
-                font-weight: 700; line-height: 1; }
-  .result-dash { width: 38px; height: 9px; }
-  .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
-             font-weight: 700; line-height: 1; }
-  .serve-bar { }
+  .tgc-score { width: 260px; height: 165px; align-items: center; justify-content: center;
+               font-weight: 800; line-height: 1; }
+  .tgc-lamp { width: 15px; height: 15px; box-sizing: border-box; }
+  .tgc-pair { width: 160px; height: 100px; align-items: center; justify-content: center;
+              font-weight: 700; line-height: 1; gap: 0.12em; }
+  .tgc-pair svg { flex-shrink: 0; display: block; }
 
-  .score.flip-anim {
+  .tgc-score.flip-anim {
     animation: score-flip 0.55s ease-in-out;
   }
   @keyframes score-flip {
-    0%   { transform: perspective(500px) translateY(0)              rotateY(0deg); }
-    25%  { transform: perspective(500px) translateY(var(--flip-lift)) rotateY(0deg); }
-    75%  { transform: perspective(500px) translateY(var(--flip-lift)) rotateY(360deg); }
-    100% { transform: perspective(500px) translateY(0)              rotateY(360deg); }
+    0%   { transform: perspective(400px) translateY(0)              rotateY(0deg); }
+    25%  { transform: perspective(400px) translateY(var(--flip-lift)) rotateY(0deg); }
+    75%  { transform: perspective(400px) translateY(var(--flip-lift)) rotateY(360deg); }
+    100% { transform: perspective(400px) translateY(0)              rotateY(360deg); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .score.flip-anim { animation: none; }
+    .tgc-score.flip-anim { animation: none; }
   }
 </style>
 </head>
@@ -50,31 +44,23 @@
   <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
     <template v-if="state">
 
-      <div class="abs name" :style="spreadPos(140, 'left', 39, 'name')">{{ state.home.name }}</div>
-      <div class="abs name" :style="spreadPos(980, 'right', 39, 'name')">{{ state.away.name }}</div>
+      <div class="abs tgc-score" ref="homeScoreEl"
+           :style="{ ...scorePos('home'), '--flip-lift': flipLift + 'px' }">{{ state.home.score }}</div>
+      <div class="abs tgc-score" ref="awayScoreEl"
+           :style="{ ...scorePos('away'), '--flip-lift': flipLift + 'px' }">{{ state.away.score }}</div>
 
-      <div class="abs score" ref="homeScoreEl"
-           :style="{ ...spreadPos(327, 'left', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state.home.score }}</div>
-      <div class="abs dash"  :style="fixedPos(896, 404, blocks.score.color)"></div>
-      <div class="abs score" ref="awayScoreEl"
-           :style="{ ...spreadPos(1167, 'right', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state.away.score }}</div>
+      <!-- 獲得セット数ランプ。一番下から上に向かって点灯する -->
+      <div v-for="l in setsLamps" :key="l.key" class="abs tgc-lamp" :style="l.style"></div>
 
-      <!-- サーブ権表示。得点の下にアンダースコア状のバーで表示する -->
-      <div v-if="state.servingTeam === 'home'" class="abs serve-bar" :style="servePos('home')"></div>
-      <div v-if="state.servingTeam === 'away'" class="abs serve-bar" :style="servePos('away')"></div>
-
-      <div v-for="c in counters" :key="c.key" class="abs counter"
-           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
-        {{ c.value }}
-      </div>
-
-      <template v-for="(r, i) in results" :key="i">
-        <div class="abs result-num"
-             :style="spreadPos(798.5, 'left', 610 + i * 108, 'result')">{{ r.home }}</div>
-        <div class="abs result-dash"
-             :style="fixedPos(941, 610 + i * 108 + 40.5, blocks.result.color)"></div>
-        <div class="abs result-num"
-             :style="spreadPos(983.5, 'right', 610 + i * 108, 'result')">{{ r.away }}</div>
+      <template v-for="c in counters" :key="c.key">
+        <div class="abs tgc-pair" :style="c.style">
+          <template v-if="c.team === 'home'">
+            <span v-html="c.icon"></span><span>{{ c.value }}</span>
+          </template>
+          <template v-else>
+            <span>{{ c.value }}</span><span v-html="c.icon"></span>
+          </template>
+        </div>
       </template>
 
     </template>
@@ -86,21 +72,28 @@ const { createApp, ref, computed, onMounted } = Vue;
 
 const DISPLAY_ID = 'tgc';
 const SYSTEM_STACK = '"Helvetica Neue", "Avenir Next", "Hiragino Sans", sans-serif';
-const COUNTERS = [
-  { kind: 'timeouts',   max: 'timeoutsPerSet',   top: 634 },
-  { kind: 'subs',       max: 'subsPerSet',       top: 774 },
-  { kind: 'challenges', max: 'challengesPerSet', top: 914 }
+const BLOCK_KEYS = ['score', 'counter'];
+
+const SCORE_CX = { home: 740, away: 1180 };
+// ランプ列は「得点」ブロックの位置に追従する。中央からの距離は固定
+const LAMP_GAP = 77.5;
+// ランプ1個の大きさと間隔(PDFの実測値をそのまま使用)
+const LAMP_SIZE = 15;
+const LAMP_PITCH = 20; // 15(本体) + 5(間隔)
+// 一番下のランプの下端の基準位置(得点の y=0 のとき)
+const LAMP_BOTTOM = 1068;
+
+const ICON_CLOCK = '<svg viewBox="0 0 24 24" width="1em" height="1em"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_REFRESH = '<svg viewBox="0 0 24 24" width="1em" height="1em"><path d="M4.5 12a7.5 7.5 0 0 1 12.6-5.5M19.5 12a7.5 7.5 0 0 1-12.6 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17.5 3.5v4h-4M6.5 20.5v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_MONITOR = '<svg viewBox="0 0 24 24" width="1em" height="1em"><rect x="2" y="4" width="14.5" height="10.5" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5.5 17.5h7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17.5" cy="15.5" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.7 17.7L22 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+const COUNTER_DEFS = [
+  { kind: 'timeouts',   max: 'timeoutsPerSet',   icon: ICON_CLOCK,   cx: 848 },
+  { kind: 'subs',       max: 'subsPerSet',       icon: ICON_REFRESH, cx: 656 },
+  { kind: 'challenges', max: 'challengesPerSet', icon: ICON_MONITOR, cx: 455 }
 ];
-const COL_X = { home: 50, away: 1687 };
-const MAX_COLOR = '#ef4444';
-const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
-// 得点欄(幅429)の水平中心。サーブ権バーをここに揃える基準点
-const SERVE_CX = { home: 541.5, away: 1381.5 };
-// バーの太さは幅(size)の13%を目安にする(アンダースコアらしい細さにするため)
-const SERVE_HEIGHT_RATIO = 0.13;
-
-const SCORE_DEFAULT_SIZE = 410;
+const SCORE_DEFAULT_SIZE = 200;
 const FLIP_LIFT = -(SCORE_DEFAULT_SIZE * 0.15);
 
 createApp({
@@ -138,48 +131,84 @@ createApp({
       return `"disp-font-${key}", ${SYSTEM_STACK}`;
     }
 
-    function pos(left, top, key) {
-      const b = blocks.value[key];
-      return {
-        left: (left + b.x) + 'px',
-        top: (top + b.y) + 'px',
-        fontSize: b.size + 'px',
-        fontFamily: fontFamilyFor(key)
-      };
-    }
-
-    function spreadPos(baseLeft, slot, baseTop, key) {
-      const b = blocks.value[key];
+    function scorePos(team) {
+      const b = blocks.value.score;
+      const slot = team === 'home' ? 'left' : 'right';
       const dx = slot === 'left' ? -b.x : b.x;
+      const cx = SCORE_CX[team] + dx;
       return {
-        left: (baseLeft + dx) + 'px',
-        top: (baseTop + b.y) + 'px',
+        left: (cx - 130) + 'px',
+        top: (900 + b.y) + 'px',
         fontSize: b.size + 'px',
-        fontFamily: fontFamilyFor(key),
+        fontFamily: fontFamilyFor('score'),
         color: b.color
       };
     }
 
-    function fixedPos(left, top, color) {
-      return { left: left + 'px', top: top + 'px', background: color };
-    }
+    // 獲得セット数のランプ。セット数(rules.format)ぶんの個数を、
+    // 一番下から上へ積む。下から setsWon 個ぶんだけ点灯させる
+    const setsLamps = computed(() => {
+      const s = state.value;
+      const b = blocks.value;
+      if (!s || !b) return [];
+      const score = b.score;
+      const total = s.rules.format;
+      const list = [];
+      for (const team of ['home', 'away']) {
+        const slot = team === 'home' ? 'left' : 'right';
+        const dx = slot === 'left' ? -score.x : score.x;
+        const cx = (team === 'home' ? 960 - LAMP_GAP : 960 + LAMP_GAP) + dx;
+        const won = s[team].setsWon;
+        for (let i = 0; i < total; i++) {
+          const lit = i < won; // i=0 が一番下
+          const bottom = LAMP_BOTTOM - i * LAMP_PITCH;
+          list.push({
+            key: team + i,
+            style: {
+              left: (cx - LAMP_SIZE / 2) + 'px',
+              top: (bottom - LAMP_SIZE + score.y) + 'px',
+              width: LAMP_SIZE + 'px',
+              height: LAMP_SIZE + 'px',
+              background: lit ? score.setsColor : 'transparent',
+              border: '2px solid ' + (lit ? score.setsColor : '#000')
+            }
+          });
+        }
+      }
+      return list;
+    });
 
-    // サーブ権バー。幅(size)を変えても常に得点欄の中心に来るよう、
-    // 中心座標から幅の半分を引いて left を決める。太さは幅から自動計算する
-    function servePos(team) {
-      const b = blocks.value.serve;
-      const slot = team === 'home' ? 'left' : 'right';
-      const dx = slot === 'left' ? -b.x : b.x;
-      const cx = SERVE_CX[team] + dx;
-      const height = Math.max(3, b.size * SERVE_HEIGHT_RATIO);
-      return {
-        left: (cx - b.size / 2) + 'px',
-        top: (605 + b.y) + 'px',
-        width: b.size + 'px',
-        height: height + 'px',
-        background: b.color
-      };
-    }
+    const counters = computed(() => {
+      const s = state.value;
+      const b = blocks.value;
+      if (!s || !b) return [];
+      const list = [];
+      for (const team of ['home', 'away']) {
+        const slot = team === 'home' ? 'left' : 'right';
+        const dx = slot === 'left' ? -b.counter.x : b.counter.x;
+        for (const c of COUNTER_DEFS) {
+          const cd = s.rules.counterDisplay[c.kind];
+          if (!cd.visible) continue;
+          const used = s[team][c.kind];
+          const max = s.rules[c.max];
+          const cx = (team === 'home' ? 960 - c.cx : 960 + c.cx) + dx;
+          list.push({
+            key: team + c.kind,
+            team,
+            icon: c.icon,
+            value: cd.mode === 'used' ? used : max - used,
+            style: {
+              left: (cx - 80) + 'px',
+              top: (968 + b.counter.y) + 'px',
+              fontSize: b.counter.size + 'px',
+              fontFamily: fontFamilyFor('counter'),
+              color: b.counter.color
+            }
+          });
+        }
+      }
+      return list;
+    });
 
     let lastSignature = '';
     function syncFontFaces() {
@@ -213,31 +242,6 @@ createApp({
       el.textContent = rules.join('\n');
     }
 
-    const results = computed(() =>
-      state.value ? state.value.setResults.slice(0, 4) : []);
-
-    const counters = computed(() => {
-      const s = state.value;
-      if (!s) return [];
-      const list = [];
-      for (const team of ['home', 'away']) {
-        for (const c of COUNTERS) {
-          const cd = s.rules.counterDisplay[c.kind];
-          if (!cd.visible) continue;
-          const used = s[team][c.kind];
-          const max = s.rules[c.max];
-          list.push({
-            key: team + c.kind,
-            left: COL_X[team],
-            top: c.top,
-            value: cd.mode === 'used' ? used : max - used,
-            maxed: used >= max
-          });
-        }
-      }
-      return list;
-    });
-
     function fit() {
       scale.value = Math.min(window.innerWidth / 1920, window.innerHeight / 1080, 1);
     }
@@ -254,7 +258,7 @@ createApp({
     onMounted(() => { fit(); window.addEventListener('resize', fit); });
 
     return {
-      state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, servePos, MAX_COLOR,
+      state, blocks, visible, scale, setsLamps, counters, scorePos,
       homeScoreEl, awayScoreEl, flipLift: FLIP_LIFT
     };
   }

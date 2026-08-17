@@ -3,9 +3,23 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { networkInterfaces } from 'node:os';
 import {
   load, scheduleSave, createInitialState, resetForNextSet, targetScore, listFonts
 } from './state.js';
+
+// LAN内のIPv4アドレスを探す（ループバックや仮想アダプタは除外）
+function getLanIp() {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -164,6 +178,7 @@ io.on('connection', (socket) => {
         if (isNum(val.y))    b.y    = clamp(val.y, -540, 540);
         if (typeof val.font === 'string') b.font = val.font.slice(0, 80);
         if (isHexColor(val.color)) b.color = val.color;
+        if (isHexColor(val.setsColor)) b.setsColor = val.setsColor;
         if (typeof val.animate === 'boolean') b.animate = val.animate;
         if (typeof val.style === 'string' && ['number', 'lamp'].includes(val.style)) {
           b.style = val.style;
@@ -177,6 +192,8 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`起動: http://localhost:${PORT}  /  http://192.168.3.163:${PORT}`);
+  const lanIp = getLanIp();
+  const lanUrl = lanIp ? `http://${lanIp}:${PORT}` : '(LAN IPが見つかりません)';
+  console.log(`起動: http://localhost:${PORT}  /  ${lanUrl}`);
   console.log(`目標点: ${targetScore(state)}点`);
 });
