@@ -140,8 +140,6 @@
 
   .anim-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.7rem; }
   .anim-row label { font-size: 0.82rem; color: var(--dim); }
-
-  .color-sub-label { font-size: 0.8rem; color: var(--dim); margin: 0.6rem 0 0.3rem; }
 </style>
 </head>
 <body>
@@ -266,8 +264,49 @@
                             :size-min="resultDef.min" :size-max="resultDef.max"
                             :default-size="resultDef.defaultSize"
                             @change="setBlock(resultDef.key, $event)"></block-editor>
-              <serve-editor label="サーブ権表示" :block="display.blocks.serve"
-                            @change="setBlock('serve', $event)"></serve-editor>
+
+              <div class="block">
+                <h3>サーブ権表示</h3>
+                <div class="row">
+                  <label>幅</label>
+                  <stepper :value="display.blocks.serve.width" :min="20" :max="700" :step="2" suffix="px"
+                           :reset-value="150" @change="setServe({ width: $event })"></stepper>
+                </div>
+                <div class="row">
+                  <label>太さ</label>
+                  <stepper :value="display.blocks.serve.thickness" :min="2" :max="100" :step="1" suffix="px"
+                           :reset-value="20" @change="setServe({ thickness: $event })"></stepper>
+                </div>
+                <div class="row">
+                  <label>得点との距離</label>
+                  <stepper :value="display.blocks.serve.gap" :min="-100" :max="300" :step="2" suffix="px"
+                           :reset-value="10" @change="setServe({ gap: $event })"></stepper>
+                </div>
+                <div class="color-picker">
+                  <div class="color-picker-head">
+                    <div class="color-swatch" :style="{ background: display.blocks.serve.color }"></div>
+                    <span class="color-hex">{{ display.blocks.serve.color }}</span>
+                  </div>
+                  <div class="color-row r">
+                    <label>R</label>
+                    <input type="range" min="0" max="255" :value="serveRgb.r" @input="setServeColor('r', $event.target.value)">
+                    <span class="color-val">{{ serveRgb.r }}</span>
+                  </div>
+                  <div class="color-row g">
+                    <label>G</label>
+                    <input type="range" min="0" max="255" :value="serveRgb.g" @input="setServeColor('g', $event.target.value)">
+                    <span class="color-val">{{ serveRgb.g }}</span>
+                  </div>
+                  <div class="color-row b">
+                    <label>B</label>
+                    <input type="range" min="0" max="255" :value="serveRgb.b" @input="setServeColor('b', $event.target.value)">
+                    <span class="color-val">{{ serveRgb.b }}</span>
+                  </div>
+                </div>
+                <p class="hint" style="margin-top:0.6rem;margin-bottom:0">
+                  横位置は「得点」の位置に自動で揃います。「間隔」は得点の下端からの距離です。
+                </p>
+              </div>
             </div>
 
             <block-editor v-if="counterDef" :label="counterDef.label"
@@ -291,29 +330,29 @@
                             show-animate
                             @change="setBlock('score', $event)"></block-editor>
               <div class="block">
-                <h3>区切り線の色</h3>
+                <h3>獲得セット数のランプ色</h3>
                 <p class="hint" style="margin-bottom:0.6rem">
-                  得点の間にある緑の点線の色です。位置は「得点」の設定にそのまま追従します。
+                  獲得セット数を示すランプの、点灯時の色です。位置は「得点」の設定にそのまま追従します。
                 </p>
                 <div class="color-picker" style="margin-top:0">
                   <div class="color-picker-head">
-                    <div class="color-swatch" :style="{ background: display.blocks.score.dashColor }"></div>
-                    <span class="color-hex">{{ display.blocks.score.dashColor }}</span>
+                    <div class="color-swatch" :style="{ background: display.blocks.score.setsColor }"></div>
+                    <span class="color-hex">{{ display.blocks.score.setsColor }}</span>
                   </div>
                   <div class="color-row r">
                     <label>R</label>
-                    <input type="range" min="0" max="255" :value="dashRgb.r" @input="setDashColor('r', $event.target.value)">
-                    <span class="color-val">{{ dashRgb.r }}</span>
+                    <input type="range" min="0" max="255" :value="setsRgb.r" @input="setSetsColor('r', $event.target.value)">
+                    <span class="color-val">{{ setsRgb.r }}</span>
                   </div>
                   <div class="color-row g">
                     <label>G</label>
-                    <input type="range" min="0" max="255" :value="dashRgb.g" @input="setDashColor('g', $event.target.value)">
-                    <span class="color-val">{{ dashRgb.g }}</span>
+                    <input type="range" min="0" max="255" :value="setsRgb.g" @input="setSetsColor('g', $event.target.value)">
+                    <span class="color-val">{{ setsRgb.g }}</span>
                   </div>
                   <div class="color-row b">
                     <label>B</label>
-                    <input type="range" min="0" max="255" :value="dashRgb.b" @input="setDashColor('b', $event.target.value)">
-                    <span class="color-val">{{ dashRgb.b }}</span>
+                    <input type="range" min="0" max="255" :value="setsRgb.b" @input="setSetsColor('b', $event.target.value)">
+                    <span class="color-val">{{ setsRgb.b }}</span>
                   </div>
                 </div>
               </div>
@@ -546,72 +585,6 @@ const BlockEditor = {
   `
 };
 
-const ServeEditor = {
-  components: { stepper: Stepper },
-  props: {
-    label: { type: String, required: true },
-    block: { type: Object, required: true }
-  },
-  emits: ['change'],
-  computed: {
-    rgb() { return rgbOf(this.block.color); }
-  },
-  methods: {
-    onColor(channel, value) {
-      const cur = { ...this.rgb };
-      cur[channel] = Number(value);
-      this.$emit('change', { color: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
-    }
-  },
-  template: `
-    <div class="block">
-      <h3>{{ label }}</h3>
-
-      <div class="row">
-        <label>幅</label>
-        <stepper :value="block.width" :min="20" :max="700" :step="2" suffix="px"
-                 :reset-value="150" @change="$emit('change', { width: $event })"></stepper>
-      </div>
-      <div class="row">
-        <label>太さ</label>
-        <stepper :value="block.thickness" :min="2" :max="100" :step="1" suffix="px"
-                 :reset-value="20" @change="$emit('change', { thickness: $event })"></stepper>
-      </div>
-      <div class="row">
-        <label>間隔</label>
-        <stepper :value="block.gap" :min="-100" :max="300" :step="2" suffix="px"
-                 :reset-value="10" @change="$emit('change', { gap: $event })"></stepper>
-      </div>
-
-      <div class="color-picker">
-        <div class="color-picker-head">
-          <div class="color-swatch" :style="{ background: block.color }"></div>
-          <span class="color-hex">{{ block.color }}</span>
-        </div>
-        <div class="color-row r">
-          <label>R</label>
-          <input type="range" min="0" max="255" :value="rgb.r" @input="onColor('r', $event.target.value)">
-          <span class="color-val">{{ rgb.r }}</span>
-        </div>
-        <div class="color-row g">
-          <label>G</label>
-          <input type="range" min="0" max="255" :value="rgb.g" @input="onColor('g', $event.target.value)">
-          <span class="color-val">{{ rgb.g }}</span>
-        </div>
-        <div class="color-row b">
-          <label>B</label>
-          <input type="range" min="0" max="255" :value="rgb.b" @input="onColor('b', $event.target.value)">
-          <span class="color-val">{{ rgb.b }}</span>
-        </div>
-      </div>
-
-      <p class="hint" style="margin-top:0.6rem;margin-bottom:0">
-        横位置は「得点」の位置に自動で揃います。「間隔」は得点の下端からの距離です。
-      </p>
-    </div>
-  `
-};
-
 createApp({
   setup() {
     const state = ref(null);
@@ -637,14 +610,11 @@ createApp({
     const counterDef = computed(() => FULL_BLOCK_DEFS.find((b) => b.key === 'counter'));
     const resultBlockDefs = RESULT_BLOCK_DEFS;
 
-    const dashRgb = computed(() =>
-      display.value && display.value.blocks.score ? rgbOf(display.value.blocks.score.dashColor) : { r: 0, g: 255, b: 0 });
+    const serveRgb = computed(() =>
+      display.value && display.value.blocks.serve ? rgbOf(display.value.blocks.serve.color) : { r: 255, g: 0, b: 0 });
 
-    function setDashColor(channel, value) {
-      const cur = { ...dashRgb.value };
-      cur[channel] = Number(value);
-      setBlock('score', { dashColor: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
-    }
+    const setsRgb = computed(() =>
+      display.value && display.value.blocks.score ? rgbOf(display.value.blocks.score.setsColor) : { r: 0, g: 255, b: 0 });
 
     const setRule = (key, value) => socket.emit('rules:set', { [key]: value });
 
@@ -666,6 +636,19 @@ createApp({
     const setDisplay = (patch) => socket.emit('display:set', { id: tab.value, patch });
     const setBlock = (key, val) => setDisplay({ blocks: { [key]: val } });
 
+    const setServe = (val) => setBlock('serve', val);
+    function setServeColor(channel, value) {
+      const cur = { ...serveRgb.value };
+      cur[channel] = Number(value);
+      setServe({ color: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
+    }
+
+    function setSetsColor(channel, value) {
+      const cur = { ...setsRgb.value };
+      cur[channel] = Number(value);
+      setBlock('score', { setsColor: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
+    }
+
     function resetMatch() {
       if (confirm('試合を最初からやり直します。スコアとセット結果が消えます。よろしいですか？')) {
         socket.emit('match:reset');
@@ -674,7 +657,7 @@ createApp({
 
     return { state, connected, fonts, tab, currentDef, display,
              counterDefs: COUNTER_DEFS, rowNameScore, resultDef, counterDef, resultBlockDefs,
-             dashRgb, setDashColor,
+             serveRgb, setServe, setServeColor, setsRgb, setSetsColor,
              setRule, isMaxed, setVisible, setMode, setDisplay, setBlock, resetMatch };
   }
 })
@@ -682,7 +665,6 @@ createApp({
 .component('toggle-switch', ToggleSwitch)
 .component('position-dpad', PositionDPad)
 .component('block-editor', BlockEditor)
-.component('serve-editor', ServeEditor)
 .mount('#app');
 </script>
 </body>

@@ -10,8 +10,7 @@
   html, body { margin: 0; padding: 0; width: 100%; height: 100%;
                background: transparent; overflow: hidden; }
   #stage {
-    position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
-    transform-origin: top left;
+    position: absolute; top: 50%; left: 50%; width: 1920px; height: 1080px;
     font-variant-numeric: tabular-nums;
     opacity: 0; transition: opacity 0.4s ease;
   }
@@ -28,7 +27,6 @@
   .result-dash { width: 38px; height: 9px; }
   .counter { width: 173px; height: 110px; align-items: center; justify-content: center;
              font-weight: 700; line-height: 1; }
-  .serve-bar { }
 
   .score.flip-anim {
     animation: score-flip 0.55s ease-in-out;
@@ -47,7 +45,7 @@
 <body>
 
 <div id="app" v-cloak>
-  <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
+  <div id="stage" :class="{ ready: visible }" :style="{ transform: `translate(-50%, -50%) scale(${scale})` }">
     <template v-if="state">
 
       <div class="abs name" :style="spreadPos(140, 'left', 39, 'name')">{{ state.home.name }}</div>
@@ -59,9 +57,8 @@
       <div class="abs score" ref="awayScoreEl"
            :style="{ ...spreadPos(1167, 'right', 180, 'score'), '--flip-lift': flipLift + 'px' }">{{ state.away.score }}</div>
 
-      <!-- サーブ権表示。得点の下にアンダースコア状のバーで表示する -->
-      <div v-if="state.servingTeam === 'home'" class="abs serve-bar" :style="servePos('home')"></div>
-      <div v-if="state.servingTeam === 'away'" class="abs serve-bar" :style="servePos('away')"></div>
+      <div v-if="state.servingTeam === 'home'" class="abs" :style="servePos('home')"></div>
+      <div v-if="state.servingTeam === 'away'" class="abs" :style="servePos('away')"></div>
 
       <div v-for="c in counters" :key="c.key" class="abs counter"
            :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
@@ -95,10 +92,8 @@ const COL_X = { home: 50, away: 1687 };
 const MAX_COLOR = '#ef4444';
 const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
-// 得点欄(幅429)の水平中心。サーブ権バーをここに揃える基準点
 const SERVE_CX = { home: 541.5, away: 1381.5 };
-// バーの太さは幅(size)の13%を目安にする(アンダースコアらしい細さにするため)
-const SERVE_HEIGHT_RATIO = 0.13;
+const SCORE_BOTTOM = 600;
 
 const SCORE_DEFAULT_SIZE = 410;
 const FLIP_LIFT = -(SCORE_DEFAULT_SIZE * 0.15);
@@ -164,20 +159,18 @@ createApp({
       return { left: left + 'px', top: top + 'px', background: color };
     }
 
-    // サーブ権バー。幅(size)を変えても常に得点欄の中心に来るよう、
-    // 中心座標から幅の半分を引いて left を決める。太さは幅から自動計算する
     function servePos(team) {
-      const b = blocks.value.serve;
+      const score = blocks.value.score;
+      const serve = blocks.value.serve;
       const slot = team === 'home' ? 'left' : 'right';
-      const dx = slot === 'left' ? -b.x : b.x;
+      const dx = slot === 'left' ? -score.x : score.x;
       const cx = SERVE_CX[team] + dx;
-      const height = Math.max(3, b.size * SERVE_HEIGHT_RATIO);
       return {
-        left: (cx - b.size / 2) + 'px',
-        top: (605 + b.y) + 'px',
-        width: b.size + 'px',
-        height: height + 'px',
-        background: b.color
+        left: (cx - serve.width / 2) + 'px',
+        top: (SCORE_BOTTOM + score.y + serve.gap) + 'px',
+        width: serve.width + 'px',
+        height: serve.thickness + 'px',
+        background: serve.color
       };
     }
 

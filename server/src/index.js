@@ -3,23 +3,9 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { networkInterfaces } from 'node:os';
 import {
   load, scheduleSave, createInitialState, resetForNextSet, targetScore, listFonts
 } from './state.js';
-
-// LAN内のIPv4アドレスを探す（ループバックや仮想アダプタは除外）
-function getLanIp() {
-  const nets = networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
-      }
-    }
-  }
-  return null;
-}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -173,9 +159,12 @@ io.on('connection', (socket) => {
       for (const [key, val] of Object.entries(patch.blocks)) {
         const b = d.blocks[key];
         if (!b || !val || typeof val !== 'object') continue;
-        if (isNum(val.size)) b.size = clamp(val.size, 8, 900);
-        if (isNum(val.x))    b.x    = clamp(val.x, -960, 960);
-        if (isNum(val.y))    b.y    = clamp(val.y, -540, 540);
+        if (isNum(val.size))      b.size      = clamp(val.size, 8, 900);
+        if (isNum(val.x))         b.x         = clamp(val.x, -960, 960);
+        if (isNum(val.y))         b.y         = clamp(val.y, -540, 540);
+        if (isNum(val.width))     b.width     = clamp(val.width, 10, 900);
+        if (isNum(val.thickness)) b.thickness = clamp(val.thickness, 1, 200);
+        if (isNum(val.gap))       b.gap       = clamp(val.gap, -400, 400);
         if (typeof val.font === 'string') b.font = val.font.slice(0, 80);
         if (isHexColor(val.color)) b.color = val.color;
         if (isHexColor(val.setsColor)) b.setsColor = val.setsColor;
@@ -192,8 +181,6 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  const lanIp = getLanIp();
-  const lanUrl = lanIp ? `http://${lanIp}:${PORT}` : '(LAN IPが見つかりません)';
-  console.log(`起動: http://localhost:${PORT}  /  ${lanUrl}`);
+  console.log(`起動: http://localhost:${PORT}  /  http://192.168.3.163:${PORT}`);
   console.log(`目標点: ${targetScore(state)}点`);
 });

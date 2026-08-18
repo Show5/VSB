@@ -44,8 +44,6 @@ const BLOCK_PRESETS = {
     serve:   { width: 150, thickness: 20, gap: 10, color: '#ff0000' },
     counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
   },
-  // tgc(卒団式用)は下部バー専用の独自構成。名前やセット結果は持たない。
-  // score には区切り線の色(dashColor)も持たせる(得点の文字色とは別に調整できる)
   tgc: {
     score:   { x: 0, y: 0, size: 200, font: 'system', color: '#000000',
                setsColor: '#00ff00', animate: true },

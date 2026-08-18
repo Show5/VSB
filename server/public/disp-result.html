@@ -10,8 +10,7 @@
   html, body { margin: 0; padding: 0; width: 100%; height: 100%;
                background: transparent; overflow: hidden; }
   #stage {
-    position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
-    transform-origin: top left;
+    position: absolute; top: 50%; left: 50%; width: 1920px; height: 1080px;
     font-variant-numeric: tabular-nums;
     opacity: 0; transition: opacity 0.4s ease;
   }
@@ -30,7 +29,7 @@
 <body>
 
 <div id="app" v-cloak>
-  <div id="stage" :class="{ ready: visible }" :style="{ transform: `scale(${scale})` }">
+  <div id="stage" :class="{ ready: visible }" :style="{ transform: `translate(-50%, -50%) scale(${scale})` }">
     <template v-if="state">
 
       <div class="abs name" :style="spreadPos(89, 'left', 39, 'name')">{{ state.home.name }}</div>
@@ -39,7 +38,6 @@
       <div class="abs setsnum" :style="spreadPos(300, 'left', 338, 'setsWon')">{{ state.home.setsWon }}</div>
       <div class="abs setsnum" :style="spreadPos(1250, 'right', 338, 'setsWon')">{{ state.away.setsWon }}</div>
 
-      <!-- 確定済みのセットのみ表示する(進行中のセットは含めない) -->
       <template v-for="(r, i) in results" :key="i">
         <div class="abs rownum" :style="spreadPos(771, 'left', rowTop(i), 'table')">{{ r.home }}</div>
         <div class="abs rowdash" :style="fixedPos(933, rowTop(i) + 40, blocks.table.color)"></div>
@@ -93,7 +91,6 @@ createApp({
       return { left: left + 'px', top: top + 'px', background: color };
     }
 
-    // 確定済みのセットをすべて表示する(件数の上限なし)
     const results = computed(() => state.value ? state.value.setResults : []);
 
     function rowTop(i) {
