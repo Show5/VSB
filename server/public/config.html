@@ -85,6 +85,7 @@
   .switch.off .switch-knob { left: 3px; }
 
   .pos-section-label { font-size: 0.9rem; color: var(--dim); margin-bottom: 0.4rem; }
+  .pos-extra-row { display: flex; gap: 0.6rem; align-items: flex-start; }
   .pos-step { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
   .pos-step-label { font-size: 0.82rem; color: var(--dim); }
   .pos-step select { width: auto; padding: 0.35rem 0.5rem; font-size: 0.85rem; }
@@ -118,6 +119,11 @@
     font-size: 0.82rem; color: var(--dim); font-variant-numeric: tabular-nums;
   }
 
+  /* 行間コントロール(位置パッドの右に並べる) */
+  .row-gap-control { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+  .row-gap-val { font-size: 0.85rem; color: var(--text); font-variant-numeric: tabular-nums; min-width: 3.4rem; text-align: center; }
+  .row-gap-control .reset { font-size: 0.72rem; padding: 0.25rem 0.5rem; height: auto; margin-top: 0.2rem; }
+
   .color-picker { margin-top: 0.7rem; }
   .color-picker-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
   .color-swatch { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--line); flex-shrink: 0; }
@@ -137,6 +143,12 @@
   .color-row.r input[type=range] { accent-color: #ff6b6b; }
   .color-row.g input[type=range] { accent-color: #51cf66; }
   .color-row.b input[type=range] { accent-color: #4dabf7; }
+
+  /* 表示色/最大値の表示色を横に並べる */
+  .color-picker-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.7rem; }
+  .color-picker-col { flex: 1 1 180px; min-width: 160px; }
+  .color-picker-col .color-picker { margin-top: 0.35rem; }
+  .color-sub-label { font-size: 0.8rem; color: var(--dim); margin-bottom: 0.2rem; }
 
   .anim-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.7rem; }
   .anim-row label { font-size: 0.82rem; color: var(--dim); }
@@ -247,7 +259,8 @@
               位置は矢印ボタンで動かします。「チーム名」「得点」「セット結果」は
               中央から寄せる/広げる形で動きます。「サーブ権表示」は横位置を持たず、
               常に「得点」の位置に自動で追従します(得点を動かすと一緒に動きます)。
-              「タイムアウト、選手交代、チャレンジ」はそのまま左右/上下に動きます。
+              「タイムアウト、選手交代、チャレンジ」はそのまま左右/上下に動き、
+              3行の間隔(行間)だけを個別に調整できます。
             </p>
 
             <div class="block-row">
@@ -304,7 +317,7 @@
                   </div>
                 </div>
                 <p class="hint" style="margin-top:0.6rem;margin-bottom:0">
-                  横位置は「得点」の位置に自動で揃います。「間隔」は得点の下端からの距離です。
+                  横位置は「得点」の位置に自動で揃います。「得点との距離」は得点の下端からの距離です。
                 </p>
               </div>
             </div>
@@ -314,6 +327,8 @@
                           :size-min="counterDef.min" :size-max="counterDef.max"
                           :default-size="counterDef.defaultSize"
                           :show-style="currentDef.counterStyleOption"
+                          show-max-color
+                          show-row-gap
                           @change="setBlock(counterDef.key, $event)"></block-editor>
           </template>
 
@@ -500,24 +515,37 @@ function rgbOf(hex) {
 const BlockEditor = {
   components: { stepper: Stepper, 'toggle-switch': ToggleSwitch, 'position-dpad': PositionDPad },
   props: {
-    label:       { type: String, required: true },
-    block:       { type: Object, required: true },
-    fonts:       { type: Array,  default: () => [] },
-    sizeMin:     { type: Number, default: 20 },
-    sizeMax:     { type: Number, default: 300 },
-    defaultSize: { type: Number, required: true },
-    showStyle:   { type: Boolean, default: false },
-    showAnimate: { type: Boolean, default: false }
+    label:        { type: String, required: true },
+    block:        { type: Object, required: true },
+    fonts:        { type: Array,  default: () => [] },
+    sizeMin:      { type: Number, default: 20 },
+    sizeMax:      { type: Number, default: 300 },
+    defaultSize:  { type: Number, required: true },
+    showStyle:    { type: Boolean, default: false },
+    showAnimate:  { type: Boolean, default: false },
+    showMaxColor: { type: Boolean, default: false },
+    showRowGap:   { type: Boolean, default: false }
   },
   emits: ['change'],
   computed: {
-    rgb() { return rgbOf(this.block.color); }
+    rgb() { return rgbOf(this.block.color); },
+    maxRgb() { return rgbOf(this.block.maxColor || '#ef4444'); }
   },
   methods: {
     onColor(channel, value) {
       const cur = { ...this.rgb };
       cur[channel] = Number(value);
       this.$emit('change', { color: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
+    },
+    onMaxColor(channel, value) {
+      const cur = { ...this.maxRgb };
+      cur[channel] = Number(value);
+      this.$emit('change', { maxColor: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
+    },
+    bumpRowGap(delta) {
+      const cur = this.block.rowGap || 0;
+      const next = Math.min(400, Math.max(-120, cur + delta));
+      this.$emit('change', { rowGap: next });
     }
   },
   template: `
@@ -546,7 +574,59 @@ const BlockEditor = {
                      :reset-value="defaultSize" @change="$emit('change', { size: $event })"></stepper>
           </div>
 
-          <div class="color-picker">
+          <template v-if="showMaxColor">
+            <div class="color-picker-row">
+              <div class="color-picker-col">
+                <div class="color-sub-label">表示色</div>
+                <div class="color-picker">
+                  <div class="color-picker-head">
+                    <div class="color-swatch" :style="{ background: block.color }"></div>
+                    <span class="color-hex">{{ block.color }}</span>
+                  </div>
+                  <div class="color-row r">
+                    <label>R</label>
+                    <input type="range" min="0" max="255" :value="rgb.r" @input="onColor('r', $event.target.value)">
+                    <span class="color-val">{{ rgb.r }}</span>
+                  </div>
+                  <div class="color-row g">
+                    <label>G</label>
+                    <input type="range" min="0" max="255" :value="rgb.g" @input="onColor('g', $event.target.value)">
+                    <span class="color-val">{{ rgb.g }}</span>
+                  </div>
+                  <div class="color-row b">
+                    <label>B</label>
+                    <input type="range" min="0" max="255" :value="rgb.b" @input="onColor('b', $event.target.value)">
+                    <span class="color-val">{{ rgb.b }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="color-picker-col">
+                <div class="color-sub-label">最大値の表示色</div>
+                <div class="color-picker">
+                  <div class="color-picker-head">
+                    <div class="color-swatch" :style="{ background: block.maxColor }"></div>
+                    <span class="color-hex">{{ block.maxColor }}</span>
+                  </div>
+                  <div class="color-row r">
+                    <label>R</label>
+                    <input type="range" min="0" max="255" :value="maxRgb.r" @input="onMaxColor('r', $event.target.value)">
+                    <span class="color-val">{{ maxRgb.r }}</span>
+                  </div>
+                  <div class="color-row g">
+                    <label>G</label>
+                    <input type="range" min="0" max="255" :value="maxRgb.g" @input="onMaxColor('g', $event.target.value)">
+                    <span class="color-val">{{ maxRgb.g }}</span>
+                  </div>
+                  <div class="color-row b">
+                    <label>B</label>
+                    <input type="range" min="0" max="255" :value="maxRgb.b" @input="onMaxColor('b', $event.target.value)">
+                    <span class="color-val">{{ maxRgb.b }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div class="color-picker" v-else>
             <div class="color-picker-head">
               <div class="color-swatch" :style="{ background: block.color }"></div>
               <span class="color-hex">{{ block.color }}</span>
@@ -578,7 +658,19 @@ const BlockEditor = {
 
         <div class="block-pos-col">
           <div class="pos-section-label">位置</div>
-          <position-dpad :x="block.x" :y="block.y" @change="$emit('change', $event)"></position-dpad>
+          <div class="pos-extra-row">
+            <position-dpad :x="block.x" :y="block.y" @change="$emit('change', $event)"></position-dpad>
+
+            <div v-if="showRowGap" class="row-gap-control">
+              <span class="pos-step-label">行間</span>
+              <button type="button" class="dpad-btn" @click="bumpRowGap(10)">▲</button>
+              <div class="row-gap-val">{{ block.rowGap || 0 }}px</div>
+              <button type="button" class="dpad-btn" @click="bumpRowGap(-10)">▼</button>
+              <button type="button" class="reset"
+                      :disabled="(block.rowGap || 0) === 0"
+                      @click="$emit('change', { rowGap: 0 })">リセット</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

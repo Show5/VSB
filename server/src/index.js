@@ -168,6 +168,8 @@ io.on('connection', (socket) => {
         if (typeof val.font === 'string') b.font = val.font.slice(0, 80);
         if (isHexColor(val.color)) b.color = val.color;
         if (isHexColor(val.setsColor)) b.setsColor = val.setsColor;
+        if (isHexColor(val.maxColor)) b.maxColor = val.maxColor;
+        if (isNum(val.rowGap)) b.rowGap = clamp(val.rowGap, -120, 400);
         if (typeof val.animate === 'boolean') b.animate = val.animate;
         if (typeof val.style === 'string' && ['number', 'lamp'].includes(val.style)) {
           b.style = val.style;

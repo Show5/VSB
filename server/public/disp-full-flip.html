@@ -62,7 +62,7 @@
       <div v-if="state.servingTeam === RIGHT" class="abs" :style="servePos(RIGHT)"></div>
 
       <div v-for="c in counters" :key="c.key" class="abs counter"
-           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? MAX_COLOR : blocks.counter.color }">
+           :style="{ ...pos(c.left, c.top, 'counter'), color: c.maxed ? blocks.counter.maxColor : blocks.counter.color }">
         {{ c.value }}
       </div>
 
@@ -89,12 +89,13 @@ const LEFT = 'away';
 const RIGHT = 'home';
 
 const COUNTERS = [
-  { kind: 'timeouts',   max: 'timeoutsPerSet',   top: 634 },
-  { kind: 'subs',       max: 'subsPerSet',       top: 774 },
-  { kind: 'challenges', max: 'challengesPerSet', top: 914 }
+  { kind: 'timeouts',   max: 'timeoutsPerSet' },
+  { kind: 'subs',       max: 'subsPerSet' },
+  { kind: 'challenges', max: 'challengesPerSet' }
 ];
+const COUNTER_BASE_TOP = 634;
+const COUNTER_BASE_PITCH = 140;
 const COL_X = { [LEFT]: 50, [RIGHT]: 1687 };
-const MAX_COLOR = '#ef4444';
 const BLOCK_KEYS = ['name', 'score', 'result', 'counter'];
 
 const SERVE_CX = { [LEFT]: 541.5, [RIGHT]: 1381.5 };
@@ -216,10 +217,13 @@ createApp({
 
     const counters = computed(() => {
       const s = state.value;
-      if (!s) return [];
+      const b = blocks.value;
+      if (!s || !b) return [];
+      const pitch = COUNTER_BASE_PITCH + (b.counter.rowGap || 0);
       const list = [];
       for (const team of [LEFT, RIGHT]) {
-        for (const c of COUNTERS) {
+        for (let i = 0; i < COUNTERS.length; i++) {
+          const c = COUNTERS[i];
           const cd = s.rules.counterDisplay[c.kind];
           if (!cd.visible) continue;
           const used = s[team][c.kind];
@@ -227,7 +231,7 @@ createApp({
           list.push({
             key: team + c.kind,
             left: COL_X[team],
-            top: c.top,
+            top: COUNTER_BASE_TOP + i * pitch,
             value: cd.mode === 'used' ? used : max - used,
             maxed: used >= max
           });
@@ -252,7 +256,7 @@ createApp({
     onMounted(() => { fit(); window.addEventListener('resize', fit); });
 
     return {
-      state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, servePos, LEFT, RIGHT, MAX_COLOR,
+      state, blocks, visible, scale, results, counters, pos, spreadPos, fixedPos, servePos, LEFT, RIGHT,
       leftScoreEl, rightScoreEl, flipLift: FLIP_LIFT
     };
   }

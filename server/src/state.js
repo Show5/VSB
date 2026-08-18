@@ -42,7 +42,8 @@ const BLOCK_PRESETS = {
     score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
     result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
     serve:   { width: 150, thickness: 20, gap: 10, color: '#ff0000' },
-    counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000', style: 'number' }
+    counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000',
+               maxColor: '#ef4444', rowGap: 0, style: 'number' }
   },
   tgc: {
     score:   { x: 0, y: 0, size: 200, font: 'system', color: '#000000',
