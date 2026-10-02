@@ -39,8 +39,11 @@ const RULES = {
 const BLOCK_PRESETS = {
   full: {
     name:    { x: 0, y: 0, size: 76,  font: 'system', color: '#000000' },
-    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000', animate: true },
-    result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000' },
+    score:   { x: 0, y: 0, size: 410, font: 'system', color: '#000000',
+               animate: true, showDash: true },
+    result:  { x: 0, y: 0, size: 124, font: 'system', color: '#000000', rowGap: 0 },
+    set:     { x: 0, y: 0, size: 76, font: 'system', color: '#000000', label: 'Sets' },
+    set:     { x: 0, y: 0, size: 76, font: 'system', color: '#000000', label: 'Sets' },
     serve:   { width: 150, thickness: 20, gap: 10, color: '#ff0000' },
     counter: { x: 0, y: 0, size: 124, font: 'system', color: '#000000',
                maxColor: '#ef4444', rowGap: 0, style: 'number' }

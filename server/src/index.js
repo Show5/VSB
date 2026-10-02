@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { networkInterfaces } from 'node:os';
 import {
   load, scheduleSave, createInitialState, resetForNextSet, targetScore, listFonts
 } from './state.js';
@@ -19,6 +20,24 @@ let state = await load();
 app.use(express.static(join(__dirname, '..', 'public')));
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/fonts', async (req, res) => res.json(await listFonts()));
+
+// LAN内の他の端末(OBS・スマホなど)からアクセスできるIPアドレスを探す。
+// Wi-Fi・有線・仮想ネットワークが混在するため、プライベートIPの範囲に絞り込む
+function findLanAddresses() {
+  const list = [];
+  for (const [name, addrs] of Object.entries(networkInterfaces())) {
+    for (const a of addrs || []) {
+      if (a.family !== 'IPv4' || a.internal) continue;
+      const ip = a.address;
+      const isPrivate =
+        ip.startsWith('192.168.') ||
+        ip.startsWith('10.') ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip);
+      if (isPrivate) list.push({ name, ip });
+    }
+  }
+  return list;
+}
 
 function broadcast() {
   io.emit('state', state);
@@ -165,12 +184,15 @@ io.on('connection', (socket) => {
         if (isNum(val.width))     b.width     = clamp(val.width, 10, 900);
         if (isNum(val.thickness)) b.thickness = clamp(val.thickness, 1, 200);
         if (isNum(val.gap))       b.gap       = clamp(val.gap, -400, 400);
+        if (isNum(val.rowGap))    b.rowGap    = clamp(val.rowGap, -120, 400);
         if (typeof val.font === 'string') b.font = val.font.slice(0, 80);
+        if (typeof val.label === 'string') b.label = val.label.slice(0, 20);
+        if (typeof val.label === 'string') b.label = val.label.slice(0, 20);
         if (isHexColor(val.color)) b.color = val.color;
         if (isHexColor(val.setsColor)) b.setsColor = val.setsColor;
         if (isHexColor(val.maxColor)) b.maxColor = val.maxColor;
-        if (isNum(val.rowGap)) b.rowGap = clamp(val.rowGap, -120, 400);
         if (typeof val.animate === 'boolean') b.animate = val.animate;
+        if (typeof val.showDash === 'boolean') b.showDash = val.showDash;
         if (typeof val.style === 'string' && ['number', 'lamp'].includes(val.style)) {
           b.style = val.style;
         }
@@ -183,6 +205,20 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`起動: http://localhost:${PORT}  /  http://192.168.3.163:${PORT}`);
-  console.log(`目標点: ${targetScore(state)}点`);
+  const lan = findLanAddresses();
+  console.log('');
+  console.log('========================================');
+  console.log(' VSB サーバーを起動しました');
+  console.log('========================================');
+  console.log(`  このPCから : http://localhost:${PORT}`);
+  if (lan.length === 0) {
+    console.log('  LAN内から  : (ネットワークに接続されていないようです)');
+  } else {
+    for (const { name, ip } of lan) {
+      console.log(`  LAN内から  : http://${ip}:${PORT}   (${name})`);
+    }
+  }
+  console.log('----------------------------------------');
+  console.log(`  目標点: ${targetScore(state)}点`);
+  console.log('');
 });

@@ -259,7 +259,7 @@
               位置は矢印ボタンで動かします。「チーム名」「得点」「セット結果」は
               中央から寄せる/広げる形で動きます。「サーブ権表示」は横位置を持たず、
               常に「得点」の位置に自動で追従します(得点を動かすと一緒に動きます)。
-              「タイムアウト、選手交代、チャレンジ」はそのまま左右/上下に動き、
+              「タイムアウト、選手交代、チャレンジ」も中央から寄せる/広げる形で動き、
               3行の間隔(行間)だけを個別に調整できます。
             </p>
 
@@ -267,7 +267,8 @@
               <block-editor v-for="b in rowNameScore" :key="b.key"
                             :label="b.label" :block="display.blocks[b.key]" :fonts="fonts"
                             :size-min="b.min" :size-max="b.max" :default-size="b.defaultSize"
-                            :show-animate="!!b.animateToggle"
+                            :show-animate="!!b.animateToggle" :show-dash-toggle="b.key === 'score'"
+                            :show-label-input="b.key === 'set'"
                             @change="setBlock(b.key, $event)"></block-editor>
             </div>
 
@@ -275,7 +276,7 @@
               <block-editor :label="resultDef.label"
                             :block="display.blocks[resultDef.key]" :fonts="fonts"
                             :size-min="resultDef.min" :size-max="resultDef.max"
-                            :default-size="resultDef.defaultSize"
+                            :default-size="resultDef.defaultSize" show-row-gap
                             @change="setBlock(resultDef.key, $event)"></block-editor>
 
               <div class="block">
@@ -409,6 +410,7 @@ const FULL_BLOCK_DEFS = [
   { key: 'name',    label: 'チーム名',                         min: 20, max: 200, defaultSize: 76 },
   { key: 'score',   label: '得点',                             min: 60, max: 700, defaultSize: 410, animateToggle: true },
   { key: 'result',  label: 'セット結果',                       min: 20, max: 300, defaultSize: 124 },
+  { key: 'set',     label: 'セット表示',                       min: 20, max: 200, defaultSize: 76 },
   { key: 'counter', label: 'タイムアウト、選手交代、チャレンジ', min: 20, max: 300, defaultSize: 124 }
 ];
 
@@ -466,12 +468,10 @@ const PositionDPad = {
   props: {
     x:     { type: Number, required: true },
     y:     { type: Number, required: true },
+    step:  { type: Number, default: 1 },
     range: { type: Number, default: 400 }
   },
-  emits: ['change'],
-  data() {
-    return { step: 1 };
-  },
+  emits: ['change', 'step-change'],
   methods: {
     clamp(v) { return Math.min(this.range, Math.max(-this.range, v)); },
     move(dx, dy) {
@@ -485,7 +485,7 @@ const PositionDPad = {
     <div>
       <div class="pos-step">
         <span class="pos-step-label">移動量</span>
-        <select v-model.number="step">
+        <select :value="step" @change="$emit('step-change', Number($event.target.value))">
           <option :value="1">1px</option>
           <option :value="10">10px</option>
           <option :value="100">100px</option>
@@ -524,9 +524,15 @@ const BlockEditor = {
     showStyle:    { type: Boolean, default: false },
     showAnimate:  { type: Boolean, default: false },
     showMaxColor: { type: Boolean, default: false },
-    showRowGap:   { type: Boolean, default: false }
+    showRowGap:   { type: Boolean, default: false },
+    showDashToggle: { type: Boolean, default: false },
+    showLabelInput: { type: Boolean, default: false }
   },
   emits: ['change'],
+  data() {
+    // 位置パッドと行間ボタンで、同じ移動量を共有する
+    return { moveStep: 1 };
+  },
   computed: {
     rgb() { return rgbOf(this.block.color); },
     maxRgb() { return rgbOf(this.block.maxColor || '#ef4444'); }
@@ -542,9 +548,9 @@ const BlockEditor = {
       cur[channel] = Number(value);
       this.$emit('change', { maxColor: '#' + toHex2(cur.r) + toHex2(cur.g) + toHex2(cur.b) });
     },
-    bumpRowGap(delta) {
+    bumpRowGap(sign) {
       const cur = this.block.rowGap || 0;
-      const next = Math.min(400, Math.max(-120, cur + delta));
+      const next = Math.min(400, Math.max(-120, cur + sign * this.moveStep));
       this.$emit('change', { rowGap: next });
     }
   },
@@ -553,6 +559,13 @@ const BlockEditor = {
       <h3>{{ label }}</h3>
       <div class="block-body">
         <div class="block-font-col">
+          <div class="row" v-if="showLabelInput">
+            <label>表示文字</label>
+            <input type="text" maxlength="20" style="flex:1 1 160px;min-width:140px"
+                   :value="block.label"
+                   @change="$emit('change', { label: $event.target.value })">
+          </div>
+
           <div class="row">
             <label>フォント</label>
             <select :value="block.font" @change="$emit('change', { font: $event.target.value })">
@@ -654,18 +667,27 @@ const BlockEditor = {
                            on-color="var(--ok)" off-color="#4b4f58"
                            @change="$emit('change', { animate: $event })"></toggle-switch>
           </div>
+
+          <div class="anim-row" v-if="showDashToggle">
+            <label>ハイフンの表示</label>
+            <toggle-switch :value="block.showDash !== false" on-text="ON" off-text="OFF"
+                           on-color="var(--ok)" off-color="#4b4f58"
+                           @change="$emit('change', { showDash: $event })"></toggle-switch>
+          </div>
         </div>
 
         <div class="block-pos-col">
           <div class="pos-section-label">位置</div>
           <div class="pos-extra-row">
-            <position-dpad :x="block.x" :y="block.y" @change="$emit('change', $event)"></position-dpad>
+            <position-dpad :x="block.x" :y="block.y" :step="moveStep"
+                           @change="$emit('change', $event)"
+                           @step-change="moveStep = $event"></position-dpad>
 
             <div v-if="showRowGap" class="row-gap-control">
               <span class="pos-step-label">行間</span>
-              <button type="button" class="dpad-btn" @click="bumpRowGap(10)">▲</button>
+              <button type="button" class="dpad-btn" @click="bumpRowGap(1)">▲</button>
               <div class="row-gap-val">{{ block.rowGap || 0 }}px</div>
-              <button type="button" class="dpad-btn" @click="bumpRowGap(-10)">▼</button>
+              <button type="button" class="dpad-btn" @click="bumpRowGap(-1)">▼</button>
               <button type="button" class="reset"
                       :disabled="(block.rowGap || 0) === 0"
                       @click="$emit('change', { rowGap: 0 })">リセット</button>
@@ -697,7 +719,7 @@ createApp({
     const display = computed(() =>
       state.value && currentDef.value ? state.value.displays[tab.value] : null);
 
-    const rowNameScore = computed(() => FULL_BLOCK_DEFS.filter((b) => ['name', 'score'].includes(b.key)));
+    const rowNameScore = computed(() => FULL_BLOCK_DEFS.filter((b) => ['name', 'score', 'set'].includes(b.key)));
     const resultDef = computed(() => FULL_BLOCK_DEFS.find((b) => b.key === 'result'));
     const counterDef = computed(() => FULL_BLOCK_DEFS.find((b) => b.key === 'counter'));
     const resultBlockDefs = RESULT_BLOCK_DEFS;
