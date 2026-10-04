@@ -17,7 +17,15 @@ const PORT = process.env.PORT || 3000;
 
 let state = await load();
 
-app.use(express.static(join(__dirname, '..', 'public')));
+app.use(express.static(join(__dirname, '..', 'public'), {
+  // 開発中・会場運用ともに、ブラウザに古いファイルを使われると
+  // 原因の分かりにくい不具合になるため、キャッシュを無効にする
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+}));
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/fonts', async (req, res) => res.json(await listFonts()));
 
