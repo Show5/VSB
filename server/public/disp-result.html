@@ -40,7 +40,7 @@
 
       <template v-for="(r, i) in results" :key="i">
         <div class="abs rownum" :style="spreadPos(771, 'left', rowTop(i), 'table')">{{ r.home }}</div>
-        <div class="abs rowdash" :style="fixedPos(933, rowTop(i) + 40, blocks.table.color)"></div>
+        <div class="abs rowdash" :style="fixedPos(933, rowTop(i) + 40 + blocks.table.y, blocks.table.color)"></div>
         <div class="abs rownum" :style="spreadPos(1000, 'right', rowTop(i), 'table')">{{ r.away }}</div>
       </template>
 
